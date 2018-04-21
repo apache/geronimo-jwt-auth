@@ -69,6 +69,7 @@ public class JwtRequest extends HttpServletRequestWrapper {
 
         // integration hook if needed
         setAttribute(JsonWebToken.class.getName() + ".supplier", tokenExtractor);
+        setAttribute(Principal.class.getName() + ".supplier", tokenExtractor);
         // not portable but used by some servers like tomee
         setAttribute("javax.security.auth.subject.callable", (Callable<Subject>) () -> {
             final Set<Principal> principals = new LinkedHashSet<>();

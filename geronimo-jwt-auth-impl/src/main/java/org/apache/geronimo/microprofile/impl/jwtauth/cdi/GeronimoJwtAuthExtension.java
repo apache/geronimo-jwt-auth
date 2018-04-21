@@ -23,7 +23,9 @@ import static java.util.function.Function.identity;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,20 +33,22 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collector;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.Dependent;
+import javax.enterprise.context.RequestScoped;
 import javax.enterprise.event.Observes;
 import javax.enterprise.inject.Any;
 import javax.enterprise.inject.Default;
 import javax.enterprise.inject.Instance;
+import javax.enterprise.inject.Vetoed;
 import javax.enterprise.inject.spi.AfterBeanDiscovery;
 import javax.enterprise.inject.spi.AfterDeploymentValidation;
 import javax.enterprise.inject.spi.BeforeBeanDiscovery;
 import javax.enterprise.inject.spi.Extension;
 import javax.enterprise.inject.spi.InjectionPoint;
-import javax.enterprise.inject.spi.ProcessAnnotatedType;
 import javax.enterprise.inject.spi.ProcessInjectionPoint;
 import javax.enterprise.util.AnnotationLiteral;
 import javax.enterprise.util.Nonbinding;
@@ -77,10 +81,6 @@ public class GeronimoJwtAuthExtension implements Extension {
         json = JsonProvider.provider();
     }
 
-    void vetoDefaultClaimQualifier(@Observes final ProcessAnnotatedType<Claim> processAnnotatedType) {
-        processAnnotatedType.veto();
-    }
-
     void captureInjections(@Observes final ProcessInjectionPoint<?, ?> processInjectionPoint) {
         final InjectionPoint injectionPoint = processInjectionPoint.getInjectionPoint();
         ofNullable(injectionPoint.getAnnotated().getAnnotation(Claim.class))
@@ -95,13 +95,13 @@ public class GeronimoJwtAuthExtension implements Extension {
                 .types(JsonWebToken.class, Object.class)
                 .qualifiers(Default.Literal.INSTANCE, Any.Literal.INSTANCE)
                 .scope(ApplicationScoped.class)
-                .createWith(ctx -> {
+                .createWith(ctx -> proxy(JsonWebToken.class, () -> {
                     final JwtRequest request = this.request.get();
                     if (request == null) {
                         throw new IllegalStateException("No JWT in this request");
                     }
                     return request.getToken();
-                });
+                }));
 
         injectionPoints.forEach(injection ->
                 afterBeanDiscovery.addBean()
@@ -117,6 +117,18 @@ public class GeronimoJwtAuthExtension implements Extension {
 
     void afterDeployment(@Observes final AfterDeploymentValidation afterDeploymentValidation) {
         errors.forEach(afterDeploymentValidation::addDeploymentProblem);
+    }
+
+    // todo: replace by actual impl, this is a lazy impl
+    private <T> T proxy(final Class<T> api, final Supplier<T> instance) {
+        return api.cast(Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{api},
+                (proxy, method, args) -> {
+                    try {
+                        return method.invoke(instance.get(), args);
+                    } catch (final InvocationTargetException ite) {
+                        throw ite.getTargetException();
+                    }
+                }));
     }
 
     private Optional<Injection> createInjection(final Claim claim, final Type type) {
@@ -207,10 +219,10 @@ public class GeronimoJwtAuthExtension implements Extension {
                             if (Set.class.isInstance(instance)) {
                                 return ((Set<String>) instance).stream()
                                         .collect(Collector.of(
-                                                        json::createArrayBuilder,
-                                                        JsonArrayBuilder::add,
-                                                        JsonArrayBuilder::addAll,
-                                                        JsonArrayBuilder::build));
+                                                json::createArrayBuilder,
+                                                JsonArrayBuilder::add,
+                                                JsonArrayBuilder::addAll,
+                                                JsonArrayBuilder::build));
                             }
                             throw new IllegalArgumentException("Unsupported value: " + instance);
                         }
@@ -318,6 +330,9 @@ public class GeronimoJwtAuthExtension implements Extension {
         }
 
         private Class<? extends Annotation> findScope() {
+            if (ClaimValue.class == findClass()) {
+                return RequestScoped.class;
+            }
             return Dependent.class;
         }
 
@@ -352,6 +367,7 @@ public class GeronimoJwtAuthExtension implements Extension {
         }
     }
 
+    @Vetoed
     private static class ClaimLiteral extends AnnotationLiteral<Claim> implements Claim {
         private final String name;
         private final Claims claims;
