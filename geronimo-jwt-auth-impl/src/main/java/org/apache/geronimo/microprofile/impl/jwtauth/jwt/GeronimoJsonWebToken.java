@@ -16,7 +16,6 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 
-import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toSet;
 
 import java.util.Set;
@@ -69,7 +68,7 @@ class GeronimoJsonWebToken implements JsonWebToken {
             if (claim.getType() == Set.class) {
                 final JsonValue jsonValue = delegate.get(claimName);
                 if (jsonValue == null) {
-                    return (T) emptySet();
+                    return null;
                 }
                 if (jsonValue.getValueType() == JsonValue.ValueType.ARRAY) {
                     return (T) JsonArray.class.cast(jsonValue).stream()
