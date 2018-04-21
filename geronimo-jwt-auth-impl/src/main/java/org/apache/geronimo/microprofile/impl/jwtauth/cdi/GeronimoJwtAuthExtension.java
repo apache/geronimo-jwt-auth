@@ -279,9 +279,9 @@ public class GeronimoJwtAuthExtension implements Extension {
                 transformer = identity();
             } catch (final IllegalArgumentException iae) {
                 if (type == String.class) {
-                    transformer = val -> JsonString.class.cast(val).getString();
+                    transformer = val -> val == null ? null : JsonString.class.cast(val).getString();
                 } else if (type == Long.class) {
-                    transformer = val -> JsonNumber.class.cast(val).longValue();
+                    transformer = val -> val == null ? null : JsonNumber.class.cast(val).longValue();
                 } else {
                     transformer = identity();
                 }
