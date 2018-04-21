@@ -15,10 +15,6 @@
   <test name="Tests">
     <classes>
       <class name="org.eclipse.microprofile.jwt.tck.container.jaxrs.PrimitiveInjectionTest">
-        <methods>
-          <include name="verifyInjectedAudience"/>
-          <include name="verifyInjectedGroups"/>
-        </methods>
       </class>
     </classes>
   </test>

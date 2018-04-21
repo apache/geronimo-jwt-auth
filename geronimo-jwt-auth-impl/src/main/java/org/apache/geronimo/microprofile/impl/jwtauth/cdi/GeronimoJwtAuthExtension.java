@@ -36,6 +36,7 @@ import java.util.stream.Collector;
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.context.Dependent;
 import javax.enterprise.event.Observes;
+import javax.enterprise.inject.Any;
 import javax.enterprise.inject.Default;
 import javax.enterprise.inject.Instance;
 import javax.enterprise.inject.spi.AfterBeanDiscovery;
@@ -92,7 +93,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 .id(GeronimoJwtAuthExtension.class.getName() + "#" + JsonWebToken.class.getName())
                 .beanClass(JsonWebToken.class)
                 .types(JsonWebToken.class, Object.class)
-                .qualifiers(Default.Literal.INSTANCE)
+                .qualifiers(Default.Literal.INSTANCE, Any.Literal.INSTANCE)
                 .scope(ApplicationScoped.class)
                 .createWith(ctx -> {
                     final JwtRequest request = this.request.get();
@@ -105,8 +106,7 @@ public class GeronimoJwtAuthExtension implements Extension {
         injectionPoints.forEach(injection ->
                 afterBeanDiscovery.addBean()
                         .id(GeronimoJwtAuthExtension.class.getName() + "#" + injection.getId())
-                        .beanClass(injection.findClass())
-                        .qualifiers(injection.literal())
+                        .qualifiers(injection.literal(), Any.Literal.INSTANCE)
                         .scope(injection.findScope())
                         .types(injection.type, Object.class)
                         .createWith(ctx -> injection.createInstance(request.get())));
@@ -334,7 +334,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 return false;
             }
             final Injection injection = Injection.class.cast(o);
-            return name.equals(injection.name) && claims == injection.claims && type.equals(injection.type);
+            return runtimeName.equals(injection.runtimeName) && type.equals(injection.type);
         }
 
         @Override
@@ -344,10 +344,7 @@ public class GeronimoJwtAuthExtension implements Extension {
 
         @Override
         public String toString() {
-            return "Injection{" +
-                    "claim='" + ofNullable(name).filter(n -> !n.isEmpty()).orElse(claims.name()) +
-                    "', type=" + type +
-                    '}';
+            return "Injection{claim='" + runtimeName + "', type=" + type + '}';
         }
     }
 
