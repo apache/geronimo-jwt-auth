@@ -198,6 +198,9 @@ public class GeronimoJwtAuthExtension implements Extension {
                         @Override
                         Object createInstance(final JwtRequest jwtRequest) {
                             final Object instance = super.createInstance(jwtRequest);
+                            if (instance == null) {
+                                return null;
+                            }
                             if (JsonArray.class.isInstance(instance)) {
                                 return instance;
                             }
