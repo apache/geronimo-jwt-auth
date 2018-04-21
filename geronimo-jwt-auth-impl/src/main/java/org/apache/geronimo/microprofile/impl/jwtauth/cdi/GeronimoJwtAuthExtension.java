@@ -106,6 +106,7 @@ public class GeronimoJwtAuthExtension implements Extension {
         injectionPoints.forEach(injection ->
                 afterBeanDiscovery.addBean()
                         .id(GeronimoJwtAuthExtension.class.getName() + "#" + injection.getId())
+                        .beanClass(injection.findClass())
                         .qualifiers(injection.literal(), Any.Literal.INSTANCE)
                         .scope(injection.findScope())
                         .types(injection.type, Object.class)
