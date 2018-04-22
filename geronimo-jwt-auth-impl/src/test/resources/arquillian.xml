@@ -28,7 +28,8 @@
         org.osgi,
         json,
         arquillian,
-        jcommander
+        jcommander,
+        microprofile-
       </property>
     </configuration>
   </container>

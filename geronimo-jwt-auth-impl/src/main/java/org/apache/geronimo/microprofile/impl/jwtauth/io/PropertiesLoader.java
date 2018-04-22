@@ -14,22 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.geronimo.microprofile.impl.jwtauth.config;
+package org.apache.geronimo.microprofile.impl.jwtauth.io;
 
-import java.util.function.Supplier;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
+import java.util.Properties;
 
-@FunctionalInterface
-public interface GeronimoJwtAuthConfig {
-    String read(String value, String def);
+public final class PropertiesLoader {
+    private PropertiesLoader() {
+        // no-op
+    }
 
-    static GeronimoJwtAuthConfig create() {
-        final Supplier<GeronimoJwtAuthConfig> delegate = () -> {
-            try {
-                return new JwtAuthConfigMpConfigImpl();
-            } catch (final NoClassDefFoundError | ExceptionInInitializerError cnfe) {
-                return new DefaultJwtAuthConfig();
-            }
-        };
-        return new PrefixedConfig(delegate.get());
+    public static Properties load(final String value) {
+        final Properties properties = new Properties();
+        try (final Reader reader = new StringReader(value)) {
+            properties.load(reader);
+        } catch (final IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+        return properties;
     }
 }

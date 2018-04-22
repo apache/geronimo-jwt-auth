@@ -30,4 +30,9 @@
 
   <artifactId>geronimo-microprofile-jwt-auth-spec</artifactId>
   <name>Geronimo JWT Auth :: Spec 1.1</name>
+
+  <properties>
+    <!-- undefined? -->
+    <geronimo.jpms.name>org.eclipse.microprofile.jwt</geronimo.jpms.name>
+  </properties>
 </project>

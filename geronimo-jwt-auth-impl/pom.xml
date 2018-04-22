@@ -32,15 +32,11 @@
 
   <properties>
     <tck.version>1.1-SNAPSHOT</tck.version>
+
+    <geronimo.jpms.name>org.apache.geronimo.microprofile.jwtauth</geronimo.jpms.name>
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.apache.tomcat</groupId>
-      <artifactId>tomcat-el-api</artifactId>
-      <version>9.0.7</version>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.eclipse.microprofile.config</groupId>
       <artifactId>microprofile-config-api</artifactId>
@@ -77,6 +73,7 @@
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <version>6.8.21</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.meecrowave</groupId>

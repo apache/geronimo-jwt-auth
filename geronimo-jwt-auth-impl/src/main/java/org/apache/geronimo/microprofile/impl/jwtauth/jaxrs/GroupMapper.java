@@ -20,13 +20,9 @@ import static java.util.Collections.singletonList;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toSet;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
@@ -34,6 +30,7 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
+import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
 
 @ApplicationScoped
 class GroupMapper {
@@ -44,18 +41,10 @@ class GroupMapper {
 
     @PostConstruct
     private void init() {
-        ofNullable(config.read("geronimo.jwt-auth.groups.mapping", null))
+        ofNullable(config.read("groups.mapping", null))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .map(s -> {
-                    final Properties properties = new Properties();
-                    try (final Reader reader = new StringReader(s)) {
-                        properties.load(reader);
-                    } catch (final IOException e) {
-                        throw new IllegalArgumentException(e);
-                    }
-                    return properties;
-                })
+                .map(PropertiesLoader::load)
                 .ifPresent(props -> props.stringPropertyNames()
                         .forEach(k -> mapping.put(k, Stream.of(props.getProperty(k).split(","))
                                 .map(String::trim)

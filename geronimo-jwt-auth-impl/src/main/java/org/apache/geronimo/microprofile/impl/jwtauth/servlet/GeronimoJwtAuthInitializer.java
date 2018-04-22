@@ -48,7 +48,7 @@ public class GeronimoJwtAuthInitializer implements ServletContainerInitializer {
                 .ifPresent(config -> {
                     final FilterRegistration.Dynamic filter = ctx.addFilter("geronimo-microprofile-jwt-auth-filter", GeronimoJwtAuthFilter.class);
                     filter.setAsyncSupported(true);
-                    filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, appConfig.read("geronimo.jwt-auth.servlet.filter.mapping", "/*"));
+                    filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, appConfig.read("servlet.filter.mapping", "/*"));
                 }));
     }
 }

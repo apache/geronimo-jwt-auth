@@ -47,8 +47,8 @@ public class GeronimoJwtAuthFilter implements Filter {
         extension = current.select(GeronimoJwtAuthExtension.class).get();
         config = current.select(GeronimoJwtAuthConfig.class).get();
 
-        headerName = config.read("geronimo.jwt-auth.header.name", "Authorization");
-        prefix = config.read("geronimo.jwt-auth.header.prefix", "bearer") + " ";
+        headerName = config.read("header.name", "Authorization");
+        prefix = config.read("header.prefix", "bearer") + " ";
     }
 
     @Override

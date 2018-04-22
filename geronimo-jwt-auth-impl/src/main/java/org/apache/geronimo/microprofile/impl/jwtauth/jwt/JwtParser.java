@@ -24,38 +24,86 @@ import java.util.Base64;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonReaderFactory;
+import javax.json.JsonString;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
+import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
 import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 @ApplicationScoped
 public class JwtParser {
+    @Inject
+    private GeronimoJwtAuthConfig config;
+
+    @Inject
+    private KidMapper kidMapper;
+
+    @Inject
+    private DateValidator dateValidator;
+
+    @Inject
+    private SignatureValidator signatureValidator;
+
     private JsonReaderFactory readerFactory;
+
+    private String defaultKid;
+    private String defaultAlg;
+    private String defaultTyp;
+    private boolean validateTyp;
 
     @PostConstruct
     private void init() {
         readerFactory = Json.createReaderFactory(emptyMap());
+        defaultKid = config.read("jwt.header.kid.default", null);
+        defaultAlg = config.read("jwt.header.alg.default", "RS256");
+        defaultTyp = config.read("jwt.header.typ.default", "JWT");
+        validateTyp = Boolean.parseBoolean(config.read("jwt.header.typ.validate", "true"));
     }
 
     public JsonWebToken parse(final String jwt) {
-        // TODO
-        final String[] split = jwt.split("\\.");
-        if (split.length != 3) {
-            // fail
+        final int firstDot = jwt.indexOf('.');
+        if (firstDot < 0) {
+            throw new JwtException("JWT is not valid", HttpURLConnection.HTTP_BAD_REQUEST);
         }
-        // sign, date validation etc but without lib please, use GeronimoJwtAuthConfig to read how in postconstruct
+        final int secondDot = jwt.indexOf('.', firstDot + 1);
+        if (secondDot < 0 || jwt.indexOf('.', secondDot + 1) > 0 || jwt.length() <= secondDot) {
+            throw new JwtException("JWT is not valid", HttpURLConnection.HTTP_BAD_REQUEST);
+        }
 
-        final byte[] token = Base64.getUrlDecoder().decode(split[1]);
-        final JsonObject json = readerFactory.createReader(new ByteArrayInputStream(token)).readObject();
-        final String issuer = json.getString(Claims.iss.name());
-        if ("INVALID_ISSUER".equals(issuer)) { // todo
+        final String rawHeader = jwt.substring(0, firstDot);
+        final JsonObject header = loadJson(rawHeader);
+        if (validateTyp && !getAttribute(header, "typ", defaultTyp).equalsIgnoreCase("jwt")) {
+            throw new JwtException("Invalid typ", HttpURLConnection.HTTP_UNAUTHORIZED);
+        }
+
+        final JsonObject payload = loadJson(jwt.substring(firstDot + 1, secondDot));
+        dateValidator.checkInterval(payload);
+
+        final String alg = getAttribute(header, "alg", defaultAlg);
+        final String kid = getAttribute(header, "kid", defaultKid);
+        if (!kidMapper.loadIssuer(kid).equals(payload.getString(Claims.iss.name()))) {
             throw new JwtException("Invalid issuer", HttpURLConnection.HTTP_UNAUTHORIZED);
         }
+        signatureValidator.verifySignature(alg, kidMapper.loadKey(kid), jwt.substring(0, secondDot), jwt.substring(secondDot + 1));
 
-        return new GeronimoJsonWebToken(jwt, json);
+        return new GeronimoJsonWebToken(jwt, payload);
+    }
+
+    private String getAttribute(final JsonObject payload, final String key, final String def) {
+        final JsonString json = payload.getJsonString(key);
+        final String value = json != null ? json.getString() : def;
+        if (value == null) {
+            throw new JwtException("No " + key + " in JWT", HttpURLConnection.HTTP_UNAUTHORIZED);
+        }
+        return value;
+    }
+
+    private JsonObject loadJson(final String src) {
+        return readerFactory.createReader(new ByteArrayInputStream(Base64.getUrlDecoder().decode(src))).readObject();
     }
 }

@@ -16,20 +16,18 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.config;
 
-import java.util.function.Supplier;
+import javax.enterprise.inject.Vetoed;
 
-@FunctionalInterface
-public interface GeronimoJwtAuthConfig {
-    String read(String value, String def);
+@Vetoed
+class PrefixedConfig implements GeronimoJwtAuthConfig {
+    private final GeronimoJwtAuthConfig delegate;
 
-    static GeronimoJwtAuthConfig create() {
-        final Supplier<GeronimoJwtAuthConfig> delegate = () -> {
-            try {
-                return new JwtAuthConfigMpConfigImpl();
-            } catch (final NoClassDefFoundError | ExceptionInInitializerError cnfe) {
-                return new DefaultJwtAuthConfig();
-            }
-        };
-        return new PrefixedConfig(delegate.get());
+    PrefixedConfig(final GeronimoJwtAuthConfig geronimoJwtAuthConfig) {
+        this.delegate = geronimoJwtAuthConfig;
+    }
+
+    @Override
+    public String read(final String value, final String def) {
+        return delegate.read("geronimo.jwt-auth." + value, def);
     }
 }
