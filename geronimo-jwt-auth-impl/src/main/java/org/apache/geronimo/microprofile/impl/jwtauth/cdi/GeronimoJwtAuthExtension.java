@@ -16,6 +16,7 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.cdi;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
@@ -23,9 +24,7 @@ import static java.util.function.Function.identity;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,7 +32,6 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collector;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -61,8 +59,10 @@ import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.spi.JsonProvider;
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
+import org.apache.geronimo.microprofile.impl.jwtauth.jwt.ContextualJsonWebToken;
 import org.apache.geronimo.microprofile.impl.jwtauth.servlet.JwtRequest;
 import org.eclipse.microprofile.jwt.Claim;
 import org.eclipse.microprofile.jwt.ClaimValue;
@@ -105,7 +105,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 .types(JsonWebToken.class, Object.class)
                 .qualifiers(Default.Literal.INSTANCE, Any.Literal.INSTANCE)
                 .scope(ApplicationScoped.class)
-                .createWith(ctx -> proxy(JsonWebToken.class, () -> {
+                .createWith(ctx -> new ContextualJsonWebToken(() -> {
                     final JwtRequest request = this.request.get();
                     if (request == null) {
                         throw new IllegalStateException("No JWT in this request");
@@ -127,18 +127,6 @@ public class GeronimoJwtAuthExtension implements Extension {
 
     void afterDeployment(@Observes final AfterDeploymentValidation afterDeploymentValidation) {
         errors.forEach(afterDeploymentValidation::addDeploymentProblem);
-    }
-
-    // todo: replace by actual impl, this is a lazy impl
-    private <T> T proxy(final Class<T> api, final Supplier<T> instance) {
-        return api.cast(Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{api},
-                (proxy, method, args) -> {
-                    try {
-                        return method.invoke(instance.get(), args);
-                    } catch (final InvocationTargetException ite) {
-                        throw ite.getTargetException();
-                    }
-                }));
     }
 
     private Optional<Injection> createInjection(final Claim claim, final Type type) {
@@ -185,7 +173,6 @@ public class GeronimoJwtAuthExtension implements Extension {
                 }
             }
         } else if (Class.class.isInstance(type)) {
-            final String name = getClaimName(claim);
             final Class<?> clazz = Class.class.cast(type);
             if (JsonValue.class.isAssignableFrom(clazz)) {
                 if (JsonString.class.isAssignableFrom(clazz)) {
@@ -269,6 +256,17 @@ public class GeronimoJwtAuthExtension implements Extension {
 
     private static String getClaimName(final String name, final Claims val) {
         return of(name).filter(s -> !s.isEmpty()).orElse(val.name());
+    }
+
+    public void execute(final HttpServletRequest req, final ServletRunnable task) {
+        try {
+            final JwtRequest jwtRequest = requireNonNull(JwtRequest.class.isInstance(req) ?
+                            JwtRequest.class.cast(req) : JwtRequest.class.cast(req.getAttribute(JwtRequest.class.getName())),
+                    "No JwtRequest");
+            execute(jwtRequest, task);
+        } catch (final IOException | ServletException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public void execute(final JwtRequest req, final ServletRunnable task) throws ServletException, IOException {

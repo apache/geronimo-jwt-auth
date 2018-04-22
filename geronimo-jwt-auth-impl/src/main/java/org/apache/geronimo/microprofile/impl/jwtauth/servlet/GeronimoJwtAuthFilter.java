@@ -16,7 +16,11 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.servlet;
 
+import static java.util.stream.Collectors.toSet;
+
 import java.io.IOException;
+import java.util.Collection;
+import java.util.stream.Stream;
 
 import javax.enterprise.inject.spi.CDI;
 import javax.servlet.Filter;
@@ -38,17 +42,21 @@ public class GeronimoJwtAuthFilter implements Filter {
     private String prefix;
     private JwtParser service;
     private GeronimoJwtAuthExtension extension;
-    private GeronimoJwtAuthConfig config;
+    private Collection<String> publicUrls;
 
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
         final CDI<Object> current = CDI.current();
         service = current.select(JwtParser.class).get();
         extension = current.select(GeronimoJwtAuthExtension.class).get();
-        config = current.select(GeronimoJwtAuthConfig.class).get();
 
+        final GeronimoJwtAuthConfig config = current.select(GeronimoJwtAuthConfig.class).get();
         headerName = config.read("header.name", "Authorization");
         prefix = config.read("header.prefix", "bearer") + " ";
+        publicUrls = Stream.of(config.read("filter.publicUrls", "").split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(toSet());
     }
 
     @Override
@@ -57,8 +65,18 @@ public class GeronimoJwtAuthFilter implements Filter {
             chain.doFilter(request, response);
             return;
         }
+
+        final HttpServletRequest httpServletRequest = HttpServletRequest.class.cast(request);
+        if (!publicUrls.isEmpty()) {
+            final String current = httpServletRequest.getRequestURI().substring(httpServletRequest.getContextPath().length());
+            if (publicUrls.stream().anyMatch(current::startsWith)) {
+                chain.doFilter(request, response);
+                return;
+            }
+        }
+
         try {
-            final JwtRequest req = new JwtRequest(service, headerName, prefix, HttpServletRequest.class.cast(request));
+            final JwtRequest req = new JwtRequest(service, headerName, prefix, httpServletRequest);
             extension.execute(req, () -> chain.doFilter(req, response));
         } catch (final Exception e) { // when not used with JAX-RS but directly Servlet
             Throwable current = e;

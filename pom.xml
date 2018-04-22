@@ -21,10 +21,6 @@
             http://maven.apache.org/POM/4.0.0
             http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <modules>
-    <module>geronimo-microprofile-jwt-auth-spec</module>
-    <module>geronimo-jwt-auth-impl</module>
-  </modules>
 
   <parent>
     <groupId>org.apache</groupId>
@@ -55,6 +51,11 @@
     <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/geronimo-jwt-auth.git</developerConnection>
     <url>https://gitbox.apache.org/repos/asf/geronimo-jwt-auth.git</url>
   </scm>
+
+  <modules>
+    <module>geronimo-microprofile-jwt-auth-spec</module>
+    <module>geronimo-jwt-auth-impl</module>
+  </modules>
 
   <dependencies>
     <dependency>

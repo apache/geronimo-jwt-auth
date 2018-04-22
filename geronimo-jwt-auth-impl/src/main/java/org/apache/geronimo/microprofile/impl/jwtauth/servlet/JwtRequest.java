@@ -68,6 +68,7 @@ public class JwtRequest extends HttpServletRequestWrapper {
         };
 
         // integration hook if needed
+        setAttribute(JwtRequest.class.getName(), this);
         setAttribute(JsonWebToken.class.getName() + ".supplier", tokenExtractor);
         setAttribute(Principal.class.getName() + ".supplier", tokenExtractor);
         // not portable but used by some servers like tomee
