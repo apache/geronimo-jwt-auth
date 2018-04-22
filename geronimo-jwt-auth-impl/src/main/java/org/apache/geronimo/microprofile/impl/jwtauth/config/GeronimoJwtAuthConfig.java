@@ -24,7 +24,7 @@ public interface GeronimoJwtAuthConfig {
         try {
             return new JwtAuthConfigMpConfigImpl();
         } catch (final NoClassDefFoundError | ExceptionInInitializerError cnfe) {
-            return System::getProperty;
+            return new DefaultJwtAuthConfig();
         }
     }
 }

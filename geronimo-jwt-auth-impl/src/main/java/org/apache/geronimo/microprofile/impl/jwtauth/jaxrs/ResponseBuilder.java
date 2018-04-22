@@ -14,23 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.geronimo.microprofile.impl.jwtauth.config;
+package org.apache.geronimo.microprofile.impl.jwtauth.jaxrs;
 
-import javax.enterprise.inject.Vetoed;
+import static java.util.Collections.emptyMap;
 
-import org.eclipse.microprofile.config.Config;
-import org.eclipse.microprofile.config.ConfigProvider;
+import javax.annotation.PostConstruct;
+import javax.enterprise.context.ApplicationScoped;
+import javax.json.Json;
+import javax.json.JsonBuilderFactory;
+import javax.json.JsonObject;
 
-@Vetoed
-class JwtAuthConfigMpConfigImpl implements GeronimoJwtAuthConfig {
-    private final Config config;
+import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
 
-    JwtAuthConfigMpConfigImpl() {
-        config = ConfigProvider.getConfig();
+@ApplicationScoped
+public class ResponseBuilder {
+    private JsonBuilderFactory factory;
+
+    @PostConstruct
+    private void createBuilderFactory() {
+        factory = Json.createBuilderFactory(emptyMap());
     }
 
-    @Override
-    public String read(final String key, final String def) {
-        return config.getOptionalValue(key, String.class).orElse(def);
+    public JsonObject toObject(final JwtException exception) {
+        return factory.createObjectBuilder()
+                .add("message", exception.getMessage())
+                .build();
     }
 }

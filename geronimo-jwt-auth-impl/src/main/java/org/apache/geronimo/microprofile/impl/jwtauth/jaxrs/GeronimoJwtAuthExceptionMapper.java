@@ -14,23 +14,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.geronimo.microprofile.impl.jwtauth.config;
+package org.apache.geronimo.microprofile.impl.jwtauth.jaxrs;
 
-import javax.enterprise.inject.Vetoed;
+import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
 
-import org.eclipse.microprofile.config.Config;
-import org.eclipse.microprofile.config.ConfigProvider;
+import javax.enterprise.context.Dependent;
+import javax.inject.Inject;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
 
-@Vetoed
-class JwtAuthConfigMpConfigImpl implements GeronimoJwtAuthConfig {
-    private final Config config;
+import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
 
-    JwtAuthConfigMpConfigImpl() {
-        config = ConfigProvider.getConfig();
-    }
+@Provider
+@Dependent
+public class GeronimoJwtAuthExceptionMapper implements ExceptionMapper<JwtException> {
+    @Inject
+    private ResponseBuilder builder;
 
     @Override
-    public String read(final String key, final String def) {
-        return config.getOptionalValue(key, String.class).orElse(def);
+    public Response toResponse(final JwtException e) {
+        return Response.status(e.getStatus())
+                .entity(builder.toObject(e))
+                .type(APPLICATION_JSON_TYPE)
+                .build();
     }
 }

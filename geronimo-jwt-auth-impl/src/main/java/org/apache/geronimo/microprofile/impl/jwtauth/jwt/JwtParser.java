@@ -19,6 +19,7 @@ package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 import static java.util.Collections.emptyMap;
 
 import java.io.ByteArrayInputStream;
+import java.net.HttpURLConnection;
 import java.util.Base64;
 
 import javax.annotation.PostConstruct;
@@ -27,10 +28,12 @@ import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonReaderFactory;
 
+import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
+import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 @ApplicationScoped
-public class JwtService {
+public class JwtParser {
     private JsonReaderFactory readerFactory;
 
     @PostConstruct
@@ -48,6 +51,11 @@ public class JwtService {
 
         final byte[] token = Base64.getUrlDecoder().decode(split[1]);
         final JsonObject json = readerFactory.createReader(new ByteArrayInputStream(token)).readObject();
+        final String issuer = json.getString(Claims.iss.name());
+        if ("INVALID_ISSUER".equals(issuer)) { // todo
+            throw new JwtException("Invalid issuer", HttpURLConnection.HTTP_UNAUTHORIZED);
+        }
+
         return new GeronimoJsonWebToken(jwt, json);
     }
 }

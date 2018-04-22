@@ -32,7 +32,7 @@ import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
-import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtService;
+import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtParser;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 public class JwtRequest extends HttpServletRequestWrapper {
@@ -40,7 +40,7 @@ public class JwtRequest extends HttpServletRequestWrapper {
     private final Supplier<JsonWebToken> tokenExtractor;
     private volatile JsonWebToken token; // cache for perf reasons
 
-    JwtRequest(final JwtService service, final String header, final String prefix, final HttpServletRequest request) {
+    JwtRequest(final JwtParser service, final String header, final String prefix, final HttpServletRequest request) {
         super(request);
         this.delegate = request;
 

@@ -38,7 +38,6 @@ public class GeronimoJwtAuthInitializer implements ServletContainerInitializer {
     @Override
     public void onStartup(final Set<Class<?>> classes, final ServletContext ctx) throws ServletException {
         final GeronimoJwtAuthConfig appConfig = GeronimoJwtAuthConfig.create();
-        ctx.setAttribute(GeronimoJwtAuthConfig.class.getName(), appConfig);
 
         ofNullable(classes).filter(c -> !c.isEmpty()).ifPresent(marked -> marked.stream()
                 .filter(Application.class::isAssignableFrom) // needed?

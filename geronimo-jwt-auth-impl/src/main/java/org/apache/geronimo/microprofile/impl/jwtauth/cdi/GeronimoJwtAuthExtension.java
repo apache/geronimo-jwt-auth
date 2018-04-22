@@ -62,6 +62,7 @@ import javax.json.JsonValue;
 import javax.json.spi.JsonProvider;
 import javax.servlet.ServletException;
 
+import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
 import org.apache.geronimo.microprofile.impl.jwtauth.servlet.JwtRequest;
 import org.eclipse.microprofile.jwt.Claim;
 import org.eclipse.microprofile.jwt.ClaimValue;
@@ -89,6 +90,15 @@ public class GeronimoJwtAuthExtension implements Extension {
     }
 
     void addClaimBeans(@Observes final AfterBeanDiscovery afterBeanDiscovery) {
+        // it is another instance than th eone used in our initializer but it should be backed by the same impl
+        afterBeanDiscovery.addBean()
+                .id(GeronimoJwtAuthExtension.class.getName() + "#" + GeronimoJwtAuthConfig.class.getName())
+                .beanClass(GeronimoJwtAuthConfig.class)
+                .types(GeronimoJwtAuthConfig.class, Object.class)
+                .qualifiers(Default.Literal.INSTANCE, Any.Literal.INSTANCE)
+                .scope(ApplicationScoped.class)
+                .createWith(ctx -> GeronimoJwtAuthConfig.create());
+
         afterBeanDiscovery.addBean()
                 .id(GeronimoJwtAuthExtension.class.getName() + "#" + JsonWebToken.class.getName())
                 .beanClass(JsonWebToken.class)

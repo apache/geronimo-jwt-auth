@@ -31,23 +31,24 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
 import org.apache.geronimo.microprofile.impl.jwtauth.cdi.GeronimoJwtAuthExtension;
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
-import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtService;
+import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtParser;
 
 public class GeronimoJwtAuthFilter implements Filter {
     private String headerName;
     private String prefix;
-    private JwtService service;
+    private JwtParser service;
     private GeronimoJwtAuthExtension extension;
+    private GeronimoJwtAuthConfig config;
 
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
-        final GeronimoJwtAuthConfig config = GeronimoJwtAuthConfig.class.cast(filterConfig.getServletContext().getAttribute(GeronimoJwtAuthConfig.class.getName()));
+        final CDI<Object> current = CDI.current();
+        service = current.select(JwtParser.class).get();
+        extension = current.select(GeronimoJwtAuthExtension.class).get();
+        config = current.select(GeronimoJwtAuthConfig.class).get();
+
         headerName = config.read("geronimo.jwt-auth.header.name", "Authorization");
         prefix = config.read("geronimo.jwt-auth.header.prefix", "bearer") + " ";
-
-        final CDI<Object> current = CDI.current();
-        service = current.select(JwtService.class).get();
-        extension = current.select(GeronimoJwtAuthExtension.class).get();
     }
 
     @Override
