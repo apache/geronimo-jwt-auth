@@ -20,6 +20,7 @@ import static java.util.stream.Collectors.toSet;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import javax.enterprise.inject.spi.CDI;
@@ -52,7 +53,9 @@ public class GeronimoJwtAuthFilter implements Filter {
 
         final GeronimoJwtAuthConfig config = current.select(GeronimoJwtAuthConfig.class).get();
         headerName = config.read("header.name", "Authorization");
-        prefix = config.read("header.prefix", "bearer") + " ";
+        prefix = Optional.of(config.read("header.prefix", "bearer"))
+                .filter(s -> !s.isEmpty()).map(s -> s + " ")
+                .orElse("");
         publicUrls = Stream.of(config.read("filter.publicUrls", "").split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -79,17 +82,20 @@ public class GeronimoJwtAuthFilter implements Filter {
             final JwtRequest req = new JwtRequest(service, headerName, prefix, httpServletRequest);
             extension.execute(req, () -> chain.doFilter(req, response));
         } catch (final Exception e) { // when not used with JAX-RS but directly Servlet
-            Throwable current = e;
-            while (current != null) {
-                if (JwtException.class.isInstance(current)) {
-                    final JwtException ex = JwtException.class.cast(current);
-                    HttpServletResponse.class.cast(response).sendError(ex.getStatus(), ex.getMessage());
-                    return;
+            final HttpServletResponse httpServletResponse = HttpServletResponse.class.cast(response);
+            if (!httpServletResponse.isCommitted()) {
+                Throwable current = e;
+                while (current != null) {
+                    if (JwtException.class.isInstance(current)) {
+                        final JwtException ex = JwtException.class.cast(current);
+                        httpServletResponse.sendError(ex.getStatus(), ex.getMessage());
+                        return;
+                    }
+                    if (current == current.getCause()) {
+                        break;
+                    }
+                    current = current.getCause();
                 }
-                if (current == current.getCause()) {
-                    break;
-                }
-                current = current.getCause();
             }
             throw e;
         }

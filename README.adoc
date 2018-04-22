@@ -1,0 +1,106 @@
+= Geronimo Microprofile JWT Auth Implementation
+
+== Artifacts
+
+=== API
+
+IMPORTANT: you can also use the eclipse bundle.
+
+[source,xml]
+----
+<parent>
+  <groupId>org.apache.geronimo</groupId>
+  <artifactId>geronimo-microprofile-jwt-auth-spec</artifactId>
+  <version>${jwtauth.version}</version>
+</parent>
+----
+
+=== Implementation
+
+IMPORTANT: you can also use the eclipse bundle.
+
+[source,xml]
+----
+<parent>
+  <groupId>org.apache.geronimo</groupId>
+  <artifactId>geronimo-jwt-auth-impl</artifactId>
+  <version>${jwtauth.version}</version>
+</parent>
+----
+
+== Configuration
+
+IMPORTANT: configuration uses Microprofile Configuration if available
+and if not system properties and `META-INF/geronimo/microprofile/jwt-auth.properties`.
+
+|===
+| Name | Description | Default
+|geronimo.jwt-auth.jwt.header.kid.default|The default `kid` if specified|-
+|geronimo.jwt-auth.jwt.header.alg.default|The default `alg` if specified|RS256
+|geronimo.jwt-auth.jwt.header.typ.default|The default `typ` if specified|JWT
+|geronimo.jwt-auth.jwt.header.typ.validate|Should the typ value be validated (only `JWT` is supported)|true
+|geronimo.jwt-auth.filter.mapping.default|When the JAX-RS `Application` doesn't have an `@ApplicationPath` and no servlet registration are found for the application this defines the path to use to handle JWT|/*
+|geronimo.jwt-auth.filter.publicUrls|List of URL to ignore|-
+|geronimo.jwt-auth.kids.key.mapping|The mapping between the kid and the public key to use|-
+|geronimo.jwt-auth.kids.issuer.mapping|The mapping of the issuer expected per kid|-
+|geronimo.jwt-auth.issuer.default|The default issuer to use when no mapping is found|-
+|geronimo.jwt-auth.header.name|The header name to read the JWT|Authorization
+|geronimo.jwt-auth.header.prefix|The header prefix to use|bearer
+|geronimo.jwt-auth.header.alg.supported|List of accepted `alg` value|RS256, accepted values: [RS\|HS][256\|384\|512]
+|geronimo.jwt-auth.exp.required|Should the validation fail if `exp` is missing|true
+|geronimo.jwt-auth.iat.required|Should the validation fail if `iat` is missing|true
+|geronimo.jwt-auth.date.tolerance|The tolerance in ms for `exp` and `iat`|60000
+|geronimo.jwt-auth.jca.provider|The JCA provider (java security)|- (built-in one)
+|geronimo.jwt-auth.groups.mapping|The mapping for the groups|-
+|===
+
+Here is a sample `META-INF/geronimo/microprofile/jwt-auth.properties`
+(assuming you don't use Microprofile config) using some of these entries:
+
+[source,properties]
+----
+# for rolesallowed accept group1 and Group1MappedRole for the requirement Group1MappedRole
+geronimo.jwt-auth.groups.mapping = \
+Group1MappedRole = group1, Group1MappedRole
+
+# the global expected issuer
+geronimo.jwt-auth.issuer.default = https://server.example.com
+
+# mapping kid1 to the embedded resource /publicKey.pem
+# can be an absolute path too
+geronimo.jwt-auth.kids.key.mapping = \
+kid1 = /publicKey.pem
+----
+
+== OpenWebBeans
+
+For this specification to work on OpenWebBeans you need to configure a few key (until 2.0.4).
+For that register a `META-INF/openwebbeans/openwebbeans.properties`:
+
+[source,properties]
+----
+configuration.ordinal=1001
+
+# OWB default is wrong and we need that
+org.apache.webbeans.container.InjectionResolver.fastMatching = false
+
+# only if you use Principal injection instead of JsonWebToken injection
+# since 2.0.5
+org.apache.webbeans.component.PrincipalBean.proxy = false
+org.apache.webbeans.spi.SecurityService = org.superbiz.MySecurityService
+----
+
+And here is a sample security service implementation:
+
+[source,java]
+----
+public class MySecurityService extends SimpleSecurityService {
+    @Override
+    public Principal getCurrentPrincipal() {
+        return ((Supplier<Principal>) CDI.current().select(HttpServletRequest.class).get()
+                .getAttribute(Principal.class.getName() + ".supplier")).get();
+    }
+}
+----
+
+IMPORTANT: in any case it is not recommanded to use CDI `Principal` API, always prefer `JsonWebToken` one.
