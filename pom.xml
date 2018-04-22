@@ -37,14 +37,6 @@
   <description>
     Apache Geronimo implementation of the Microprofile JWT Auth Specification
   </description>
-  <url>http://geronimo.apache.org/maven/geronimo-jwt-auth/${project.version}</url>
-
-  <distributionManagement>
-    <site>
-      <id>apache-website</id>
-      <url>${site.deploy.url}/maven/geronimo-jwt-auth/${project.version}</url>
-    </site>
-  </distributionManagement>
 
   <scm>
     <connection>scm:git:https://gitbox.apache.org/repos/asf/geronimo-jwt-auth.git</connection>
@@ -127,4 +119,33 @@
       </plugin>
     </plugins>
   </build>
+
+
+  <organization>
+    <name>The Apache Software Foundation</name>
+    <url>http://www.apache.org/</url>
+  </organization>
+
+  <inceptionYear>2017</inceptionYear>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Apache Geronimo Community</name>
+      <url>https://geronimo.apache.org</url>
+      <organization>Apache</organization>
+    </developer>
+  </developers>
+
+  <issueManagement>
+    <system>ASF JIRA</system>
+    <url>https://issues.apache.org/jira/browse/GERONIMO</url>
+  </issueManagement>
 </project>
