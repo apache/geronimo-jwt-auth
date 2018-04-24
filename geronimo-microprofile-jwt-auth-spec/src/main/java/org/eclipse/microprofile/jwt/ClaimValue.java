@@ -18,6 +18,12 @@ package org.eclipse.microprofile.jwt;
 
 import java.security.Principal;
 
+/**
+ * Mark an injection as being lazily evaluated.
+ * The content is loaded form the JWT.
+ *
+ * @param <TYPE> the expected type of the value.
+ */
 public interface ClaimValue<TYPE> extends Principal {
     @Override
     String getName();

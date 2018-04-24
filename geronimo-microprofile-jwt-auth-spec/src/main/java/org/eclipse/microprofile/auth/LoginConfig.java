@@ -24,11 +24,24 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+/**
+ * Marks a JAX-RS {@link javax.ws.rs.core.Application}
+ * to activate some security mecanism.
+ */
 @Inherited
 @Documented
 @Target(TYPE)
 @Retention(RUNTIME)
 public @interface LoginConfig {
+    /**
+     * @return the authentication method to use, only supports <code>MP-JWT</code> for now.
+     */
     String authMethod();
+
+    /**
+     * IMPORTANT: not used for <code>MP-JWT</code> authentication method.
+     *
+     * @return the realm name to use for the authentication method.
+     */
     String realmName() default "";
 }

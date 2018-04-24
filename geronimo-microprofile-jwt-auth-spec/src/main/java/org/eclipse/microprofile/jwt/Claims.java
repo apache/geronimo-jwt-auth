@@ -20,6 +20,9 @@ import java.util.Set;
 
 import javax.json.JsonObject;
 
+/**
+ * List of standard and predefined JWT payload entries.
+ */
 // important: ensure to respect the spec order
 public enum Claims {
     iss("Issuer", String.class),

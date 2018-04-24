@@ -28,13 +28,22 @@ import java.lang.annotation.Target;
 import javax.enterprise.util.Nonbinding;
 import javax.inject.Qualifier;
 
+/**
+ * Mark an injection point to be fulfilled from the contextual JWT.
+ */
 @Qualifier
 @Retention(RUNTIME)
 @Target({FIELD, METHOD, PARAMETER, TYPE})
 public @interface Claim {
+    /**
+     * @return the key in the JWT payload.
+     */
     @Nonbinding
     String value() default "";
 
+    /**
+     * @return the name of this enum value is used if value is empty.
+     */
     @Nonbinding
     Claims standard() default Claims.UNKNOWN;
 }

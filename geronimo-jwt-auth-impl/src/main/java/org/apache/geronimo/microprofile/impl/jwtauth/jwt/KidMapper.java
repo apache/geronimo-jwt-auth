@@ -25,10 +25,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -36,6 +42,7 @@ import javax.inject.Inject;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
 import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
+import org.eclipse.microprofile.jwt.config.Names;
 
 @ApplicationScoped
 public class KidMapper {
@@ -43,8 +50,9 @@ public class KidMapper {
     private GeronimoJwtAuthConfig config;
 
     private final ConcurrentMap<String, String> keyMapping = new ConcurrentHashMap<>();
-    private final Map<String, String> issuerMapping = new HashMap<>();
-    private String defaultIssuer;
+    private final Map<String, Collection<String>> issuerMapping = new HashMap<>();
+    private String defaultKey;
+    private Set<String> defaultIssuers;
 
     @PostConstruct
     private void init() {
@@ -59,8 +67,20 @@ public class KidMapper {
                 .filter(s -> !s.isEmpty())
                 .map(PropertiesLoader::load)
                 .ifPresent(props -> props.stringPropertyNames()
-                        .forEach(k -> issuerMapping.put(k, props.getProperty(k))));
-        defaultIssuer = config.read("issuer.default", null);
+                        .forEach(k -> {
+                            issuerMapping.put(k, Stream.of(props.getProperty(k).split(","))
+                                                       .map(String::trim)
+                                                       .filter(s -> !s.isEmpty())
+                                                       .collect(Collectors.toSet()));
+                        }));
+        defaultIssuers = ofNullable(config.read(Names.ISSUERS, null))
+                                .map(s -> Stream.of(s.split(","))
+                                    .map(String::trim)
+                                    .filter(it -> !it.isEmpty())
+                                    .collect(Collectors.toSet()))
+                                .orElseGet(HashSet::new);
+        ofNullable(config.read("issuer.default", config.read(Names.ISSUER, null))).ifPresent(defaultIssuers::add);
+        defaultKey = config.read("public-key.default", config.read(Names.VERIFIER_PUBLIC_KEY, null));
     }
 
     String loadKey(final String property) {
@@ -69,13 +89,15 @@ public class KidMapper {
             value = tryLoad(property);
             if (value != null && !property.equals(value) /* else we can leak easily*/) {
                 keyMapping.putIfAbsent(property, value);
+            } else if (defaultKey != null) {
+                value = defaultKey;
             }
         }
         return value;
     }
 
-    String loadIssuer(final String property) {
-        return issuerMapping.getOrDefault(property, defaultIssuer);
+    Stream<String> loadIssuers(final String property) {
+        return issuerMapping.getOrDefault(property, defaultIssuers).stream();
     }
 
     private String tryLoad(final String value) {

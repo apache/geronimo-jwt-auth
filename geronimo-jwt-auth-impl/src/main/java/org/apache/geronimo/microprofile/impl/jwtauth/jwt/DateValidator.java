@@ -16,6 +16,8 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 
+import static java.util.Optional.ofNullable;
+
 import java.net.HttpURLConnection;
 
 import javax.annotation.PostConstruct;
@@ -27,6 +29,7 @@ import javax.json.JsonObject;
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
 import org.eclipse.microprofile.jwt.Claims;
+import org.eclipse.microprofile.jwt.config.Names;
 
 @ApplicationScoped
 public class DateValidator {
@@ -40,7 +43,10 @@ public class DateValidator {
     private void init() {
         expirationMandatory = Boolean.parseBoolean(config.read("exp.required", "true"));
         issuedAtTimeMandatory = Boolean.parseBoolean(config.read("iat.required", "true"));
-        tolerance = Long.parseLong(config.read("date.tolerance", "60000")); // 1mn
+        tolerance = Long.parseLong(config.read("date.tolerance",
+                Long.toString(ofNullable(config.read(Names.CLOCK_SKEW, null))
+                        .map(Long::parseLong).map(it -> it * 1000)
+                        .orElse(60000L))));
     }
 
     void checkInterval(final JsonObject payload) {
