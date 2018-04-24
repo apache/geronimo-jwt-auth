@@ -49,10 +49,12 @@ public class SignatureValidator {
 
     private Set<String> supportedAlgorithms;
     private String jcaProvider;
+    private boolean useCache;
     private final ConcurrentMap<String, PublicKey> publicKeyCache = new ConcurrentHashMap<>();
 
     @PostConstruct
     private void init() {
+        useCache = Boolean.parseBoolean(config.read("public-key.cache.active", "true"));
         supportedAlgorithms = Stream.of(config.read("header.alg.supported", "RS256").split(","))
                 .map(String::trim)
                 .map(s -> s.toLowerCase(Locale.ROOT))
@@ -104,7 +106,7 @@ public class SignatureValidator {
     }
 
     private PublicKey toPublicKey(final String key, final String algo) {
-        PublicKey publicKey = publicKeyCache.get(key);
+        PublicKey publicKey = useCache ? publicKeyCache.get(key) : null;
         if (publicKey == null) {
             final byte[] decoded = Base64.getDecoder().decode(key
                     .replace("-----BEGIN RSA KEY-----", "")
@@ -121,7 +123,9 @@ public class SignatureValidator {
                         final X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
                         final KeyFactory keyFactory = KeyFactory.getInstance(algo);
                         publicKey = keyFactory.generatePublic(keySpec);
-                        publicKeyCache.putIfAbsent(key, publicKey);
+                        if (useCache) {
+                            publicKeyCache.putIfAbsent(key, publicKey);
+                        }
                         break;
                     }
                     case "EC": // TODO
