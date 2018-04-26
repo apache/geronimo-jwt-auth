@@ -86,7 +86,11 @@ public class JwtParser {
 
         final String alg = getAttribute(header, "alg", defaultAlg);
         final String kid = getAttribute(header, "kid", defaultKid);
-        if (!kidMapper.loadIssuer(kid).equals(payload.getString(Claims.iss.name()))) {
+        String issuer = kidMapper.loadIssuer(kid);
+        if (issuer == null) {
+            throw new JwtException("No issuer for kid (no mapping and/or default issuer)", HttpURLConnection.HTTP_UNAUTHORIZED);
+        }
+        if (!issuer.equals(payload.getString(Claims.iss.name()))) {
             throw new JwtException("Invalid issuer", HttpURLConnection.HTTP_UNAUTHORIZED);
         }
         signatureValidator.verifySignature(alg, kidMapper.loadKey(kid), jwt.substring(0, secondDot), jwt.substring(secondDot + 1));
