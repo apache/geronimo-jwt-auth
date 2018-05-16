@@ -27,9 +27,7 @@
   <name>Geronimo JWT Auth :: Impl</name>
 
   <properties>
-    <!-- until tck are released
     <tck.version>1.1-SNAPSHOT</tck.version>
-    -->
 
     <geronimo.jpms.name>org.apache.geronimo.microprofile.jwtauth</geronimo.jpms.name>
   </properties>
@@ -85,7 +83,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- until tck are released
     <dependency>
       <groupId>org.eclipse.microprofile.jwt</groupId>
       <artifactId>microprofile-jwt-auth-tck</artifactId>
@@ -105,7 +102,6 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
-    -->
   </dependencies>
 
   <build>
@@ -115,11 +111,9 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.21.0</version>
         <configuration>
-          <!-- until tck are released
           <suiteXmlFiles>
             <suiteXmlFile>${project.basedir}/src/test/resources/tck.xml</suiteXmlFile>
           </suiteXmlFiles>
-          -->
         </configuration>
       </plugin>
     </plugins>
