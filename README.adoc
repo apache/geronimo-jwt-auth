@@ -39,6 +39,7 @@ and if not system properties and `META-INF/geronimo/microprofile/jwt-auth.proper
 |geronimo.jwt-auth.jwt.header.alg.default|The default `alg` if specified|RS256
 |geronimo.jwt-auth.jwt.header.typ.default|The default `typ` if specified|JWT
 |geronimo.jwt-auth.jwt.header.typ.validate|Should the typ value be validated (only `JWT` is supported)|true
+|geronimo.jwt-auth.filter.active|If `true` it forces the filter to be added whatever config (`@LoginConfig` is used or not)|false
 |geronimo.jwt-auth.filter.mapping.default|When the JAX-RS `Application` doesn't have an `@ApplicationPath` and no servlet registration are found for the application this defines the path to use to handle JWT|/*
 |geronimo.jwt-auth.filter.publicUrls|List of URL to ignore|-
 |geronimo.jwt-auth.kids.key.mapping|The mapping between the kid and the public key to use|-

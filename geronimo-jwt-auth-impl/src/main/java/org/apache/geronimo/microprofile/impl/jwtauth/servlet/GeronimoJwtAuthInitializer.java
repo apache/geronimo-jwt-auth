@@ -21,6 +21,7 @@ import static java.util.Optional.ofNullable;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
@@ -39,12 +40,23 @@ import org.eclipse.microprofile.auth.LoginConfig;
 public class GeronimoJwtAuthInitializer implements ServletContainerInitializer {
     @Override
     public void onStartup(final Set<Class<?>> classes, final ServletContext ctx) throws ServletException {
-        ofNullable(classes).filter(c -> !c.isEmpty()).ifPresent(marked -> marked.stream()
-                .filter(Application.class::isAssignableFrom) // needed? what's the issue dropping it? nothing normally
-                .filter(app -> app.isAnnotationPresent(LoginConfig.class))
-                .filter(it -> "MP-JWT".equalsIgnoreCase(it.getAnnotation(LoginConfig.class).authMethod()))
-                .sorted(Comparator.comparing(Class::getName)) // to be deterministic
-                .findFirst()
+        final Supplier<GeronimoJwtAuthConfig> config = new Supplier<GeronimoJwtAuthConfig>() {
+            private GeronimoJwtAuthConfig config;
+
+            @Override
+            public GeronimoJwtAuthConfig get() {
+                return config == null ? config = GeronimoJwtAuthConfig.create() : config;
+            }
+        };
+        ofNullable(classes).filter(c -> !c.isEmpty()).ifPresent(marked -> // needed? what's the issue dropping it?
+                // nothing normally
+                // to be deterministic
+                marked.stream()
+                      .filter(Application.class::isAssignableFrom) // needed? what's the issue dropping it? nothing
+                      // normally
+                      .filter(app -> "true".equalsIgnoreCase(config.get().read("filter.active", "false")) ||
+                              (app.isAnnotationPresent(LoginConfig.class) && "MP-JWT".equalsIgnoreCase(app.getAnnotation(LoginConfig.class).authMethod())))
+                      .min(Comparator.comparing(Class::getName))
                 .ifPresent(app -> {
                     final FilterRegistration.Dynamic filter = ctx.addFilter("geronimo-microprofile-jwt-auth-filter", GeronimoJwtAuthFilter.class);
                     filter.setAsyncSupported(true);
@@ -70,7 +82,7 @@ public class GeronimoJwtAuthInitializer implements ServletContainerInitializer {
                                 }
 
                                 // unlikely
-                                return new String[]{GeronimoJwtAuthConfig.create().read("filter.mapping.default", "/*")};
+                                return new String[]{config.get().read("filter.mapping.default", "/*")};
                             });
                     filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, mappings);
                 }));
