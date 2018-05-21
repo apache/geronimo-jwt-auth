@@ -40,51 +40,53 @@ import org.eclipse.microprofile.auth.LoginConfig;
 public class GeronimoJwtAuthInitializer implements ServletContainerInitializer {
     @Override
     public void onStartup(final Set<Class<?>> classes, final ServletContext ctx) throws ServletException {
-        final Supplier<GeronimoJwtAuthConfig> config = new Supplier<GeronimoJwtAuthConfig>() {
-            private GeronimoJwtAuthConfig config;
-
-            @Override
-            public GeronimoJwtAuthConfig get() {
-                return config == null ? config = GeronimoJwtAuthConfig.create() : config;
-            }
-        };
+        final GeronimoJwtAuthConfig config = GeronimoJwtAuthConfig.create();
+        final boolean forceSetup = "true".equalsIgnoreCase(config.read("filter.active", "false"));
+        if (forceSetup) {
+            doSetup(ctx, config, null);
+            return;
+        }
         ofNullable(classes).filter(c -> !c.isEmpty()).ifPresent(marked -> // needed? what's the issue dropping it?
                 // nothing normally
                 // to be deterministic
                 marked.stream()
                       .filter(Application.class::isAssignableFrom) // needed? what's the issue dropping it? nothing
                       // normally
-                      .filter(app -> "true".equalsIgnoreCase(config.get().read("filter.active", "false")) ||
+                      .filter(app -> forceSetup ||
                               (app.isAnnotationPresent(LoginConfig.class) && "MP-JWT".equalsIgnoreCase(app.getAnnotation(LoginConfig.class).authMethod())))
                       .min(Comparator.comparing(Class::getName))
                 .ifPresent(app -> {
-                    final FilterRegistration.Dynamic filter = ctx.addFilter("geronimo-microprofile-jwt-auth-filter", GeronimoJwtAuthFilter.class);
-                    filter.setAsyncSupported(true);
-                    final String[] mappings = ofNullable(app.getAnnotation(ApplicationPath.class))
-                            .map(ApplicationPath::value)
-                            .map(v -> (!v.startsWith("/") ? "/" : "") +
-                                    (v.contains("{") ? v.substring(0, v.indexOf("{")) : v) +
-                                    (v.endsWith("/") ? "" : "/") +
-                                    "*")
-                            .map(v -> new String[]{v})
-                            .orElseGet(() -> {
-                                final ServletRegistration defaultServlet = ctx.getServletRegistration(Application.class.getName());
-                                if (defaultServlet != null && !defaultServlet.getMappings().isEmpty()) {
-                                    return defaultServlet.getMappings().toArray(new String[defaultServlet.getMappings().size()]);
-                                }
-
-                                final String[] servletMapping = ctx.getServletRegistrations().values().stream()
-                                        .filter(r -> r.getInitParameter("javax.ws.rs.Application") != null)
-                                        .flatMap(r -> r.getMappings().stream())
-                                        .toArray(String[]::new);
-                                if (servletMapping.length > 0) {
-                                    return servletMapping;
-                                }
-
-                                // unlikely
-                                return new String[]{config.get().read("filter.mapping.default", "/*")};
-                            });
-                    filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, mappings);
+                    doSetup(ctx, config, app);
                 }));
+    }
+
+    private void doSetup(final ServletContext ctx, final GeronimoJwtAuthConfig config, final Class<?> app) {
+        final FilterRegistration.Dynamic filter = ctx.addFilter("geronimo-microprofile-jwt-auth-filter", GeronimoJwtAuthFilter.class);
+        filter.setAsyncSupported(true);
+        final String[] mappings = ofNullable(app).map(a -> a.getAnnotation(ApplicationPath.class))
+                .map(ApplicationPath::value)
+                .map(v -> (!v.startsWith("/") ? "/" : "") +
+                        (v.contains("{") ? v.substring(0, v.indexOf("{")) : v) +
+                        (v.endsWith("/") ? "" : "/") +
+                        "*")
+                .map(v -> new String[]{v})
+                .orElseGet(() -> {
+                    final ServletRegistration defaultServlet = ctx.getServletRegistration(Application.class.getName());
+                    if (defaultServlet != null && !defaultServlet.getMappings().isEmpty()) {
+                        return defaultServlet.getMappings().toArray(new String[defaultServlet.getMappings().size()]);
+                    }
+
+                    final String[] servletMapping = ctx.getServletRegistrations().values().stream()
+                            .filter(r -> r.getInitParameter("javax.ws.rs.Application") != null)
+                            .flatMap(r -> r.getMappings().stream())
+                            .toArray(String[]::new);
+                    if (servletMapping.length > 0) {
+                        return servletMapping;
+                    }
+
+                    // unlikely
+                    return new String[]{config.read("filter.mapping.default", "/*")};
+                });
+        filter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, mappings);
     }
 }
