@@ -17,8 +17,6 @@ IMPORTANT: you can also use the eclipse bundle.
 
 === Implementation
 
-IMPORTANT: you can also use the eclipse bundle.
-
 [source,xml]
 ----
 <parent>
@@ -77,10 +75,10 @@ geronimo.jwt-auth.kids.key.mapping = \
 kid1 = /publicKey.pem
 ----
 
-== OpenWebBeans
+== Apache OpenWebBeans
 
-For this specification to work on OpenWebBeans you need to configure a few key (until 2.0.4).
-For that register a `META-INF/openwebbeans/openwebbeans.properties`:
+For this specification to work on Apache OpenWebBeans you need to configure a few keys (until 2.0.4).
+For that, register a `META-INF/openwebbeans/openwebbeans.properties`:
 
 [source,properties]
 ----
@@ -108,4 +106,4 @@ public class MySecurityService extends SimpleSecurityService {
 }
 ----
 
-IMPORTANT: in any case it is not recommanded to use CDI `Principal` API, always prefer `JsonWebToken` one.
+IMPORTANT: in any case it is not recommended to use CDI `Principal` API, always prefer `JsonWebToken` one.

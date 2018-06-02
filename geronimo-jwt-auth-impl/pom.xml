@@ -27,8 +27,6 @@
   <name>Geronimo JWT Auth :: Impl</name>
 
   <properties>
-    <tck.version>1.1-SNAPSHOT</tck.version>
-
     <geronimo.jpms.name>org.apache.geronimo.microprofile.jwtauth</geronimo.jpms.name>
   </properties>
 

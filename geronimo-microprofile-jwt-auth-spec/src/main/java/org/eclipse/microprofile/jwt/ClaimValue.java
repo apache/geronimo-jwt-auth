@@ -25,7 +25,20 @@ import java.security.Principal;
  * @param <TYPE> the expected type of the value.
  */
 public interface ClaimValue<TYPE> extends Principal {
+
+    /**
+     * This is the name of the claim we need an injection for.
+     * Check out org.eclipse.microprofile.jwt.Claims for a list of well known claims.
+     *
+     * @return name of the claim
+     */
     @Override
     String getName();
+
+    /**
+     * The value of the claim extracted from the JWT for the key defined above.
+     *
+     * @return the value of the claim
+     */
     TYPE getValue();
 }

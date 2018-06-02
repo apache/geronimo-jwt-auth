@@ -397,7 +397,7 @@ public class GeronimoJwtAuthExtension implements Extension {
 
         @Override
         public String toString() {
-            return super.toString().replace(", ", ", ");
+            return super.toString();
         }
     }
 }

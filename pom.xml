@@ -46,6 +46,10 @@
     <module>geronimo-jwt-auth-impl</module>
   </modules>
 
+  <properties>
+    <tck.version>1.1</tck.version>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.tomcat</groupId>
@@ -123,7 +127,7 @@
     <url>http://www.apache.org/</url>
   </organization>
 
-  <inceptionYear>2017</inceptionYear>
+  <inceptionYear>2018</inceptionYear>
 
   <licenses>
     <license>
