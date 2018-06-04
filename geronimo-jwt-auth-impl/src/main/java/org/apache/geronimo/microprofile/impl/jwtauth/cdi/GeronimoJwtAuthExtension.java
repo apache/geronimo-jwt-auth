@@ -395,9 +395,6 @@ public class GeronimoJwtAuthExtension implements Extension {
             return claims;
         }
 
-        @Override
-        public String toString() {
-            return super.toString();
-        }
+    }
     }
 }
