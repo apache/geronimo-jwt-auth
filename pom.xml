@@ -27,7 +27,6 @@
   <groupId>org.apache.geronimo</groupId>
   <artifactId>geronimo-jwt-auth</artifactId>
   <version>1.0.1-SNAPSHOT</version>
-  <packaging>pom</packaging>
   <name>Geronimo JWT Auth</name>
 
   <description>
@@ -41,16 +40,16 @@
     <tag>HEAD</tag>
   </scm>
 
-  <modules>
-    <module>geronimo-microprofile-jwt-auth-spec</module>
-    <module>geronimo-jwt-auth-impl</module>
-  </modules>
-
   <properties>
-    <tck.version>1.1</tck.version>
+    <spec.version>1.1</spec.version>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.eclipse.microprofile.jwt</groupId>
+      <artifactId>microprofile-jwt-auth-api</artifactId>
+      <version>${spec.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.tomcat</groupId>
       <artifactId>tomcat-servlet-api</artifactId>
@@ -93,6 +92,69 @@
       <version>1.0</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.eclipse.microprofile.config</groupId>
+      <artifactId>microprofile-config-api</artifactId>
+      <version>1.2</version>
+      <scope>provided</scope>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency> <!-- issue with the cache key -->
+      <groupId>org.apache.openwebbeans</groupId>
+      <artifactId>openwebbeans-impl</artifactId>
+      <version>2.0.5</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.geronimo.specs</groupId>
+      <artifactId>geronimo-jacc_1.1_spec</artifactId>
+      <version>1.0.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jboss.arquillian.testng</groupId>
+      <artifactId>arquillian-testng-container</artifactId>
+      <version>1.1.13.Final</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <version>6.8.21</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.meecrowave</groupId>
+      <artifactId>meecrowave-arquillian</artifactId>
+      <version>1.2.1</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.inject</groupId>
+          <artifactId>javax.inject</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.microprofile.jwt</groupId>
+      <artifactId>microprofile-jwt-auth-tck</artifactId>
+      <version>${spec.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.enterprise</groupId>
+          <artifactId>cdi-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.microprofile.jwt</groupId>
+      <artifactId>microprofile-jwt-auth-tck</artifactId>
+      <version>${spec.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -108,19 +170,28 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.21.0</version>
+        <configuration>
+          <suiteXmlFiles>
+            <suiteXmlFile>${project.basedir}/src/test/resources/tck.xml</suiteXmlFile>
+          </suiteXmlFiles>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>3.0.2</version>
         <configuration>
           <archive combine.children="append">
             <manifestEntries>
-              <Automatic-Module-Name>${geronimo.jpms.name}</Automatic-Module-Name>
+              <Automatic-Module-Name>org.apache.geronimo.microprofile.jwtauth</Automatic-Module-Name>
             </manifestEntries>
           </archive>
         </configuration>
       </plugin>
     </plugins>
   </build>
-
 
   <organization>
     <name>The Apache Software Foundation</name>

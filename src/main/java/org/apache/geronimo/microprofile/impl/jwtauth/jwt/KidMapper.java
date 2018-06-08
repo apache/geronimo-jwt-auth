@@ -73,7 +73,7 @@ public class KidMapper {
                                                        .filter(s -> !s.isEmpty())
                                                        .collect(Collectors.toSet()));
                         }));
-        defaultIssuers = ofNullable(config.read(Names.ISSUERS, null))
+        defaultIssuers = ofNullable(config.read("org.eclipse.microprofile.authentication.JWT.issuers", null))
                                 .map(s -> Stream.of(s.split(","))
                                     .map(String::trim)
                                     .filter(it -> !it.isEmpty())

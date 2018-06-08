@@ -394,7 +394,5 @@ public class GeronimoJwtAuthExtension implements Extension {
         public Claims standard() {
             return claims;
         }
-
-    }
     }
 }

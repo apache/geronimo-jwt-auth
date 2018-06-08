@@ -44,7 +44,7 @@ public class DateValidator {
         expirationMandatory = Boolean.parseBoolean(config.read("exp.required", "true"));
         issuedAtTimeMandatory = Boolean.parseBoolean(config.read("iat.required", "true"));
         tolerance = Long.parseLong(config.read("date.tolerance",
-                Long.toString(ofNullable(config.read(Names.CLOCK_SKEW, null))
+                Long.toString(ofNullable(config.read("org.eclipse.microprofile.authentication.JWT.clockSkew", null))
                         .map(Long::parseLong).map(it -> it * 1000)
                         .orElse(60000L))));
     }
