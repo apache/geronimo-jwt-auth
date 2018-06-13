@@ -26,7 +26,7 @@
 
   <groupId>org.apache.geronimo</groupId>
   <artifactId>geronimo-jwt-auth</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1-SNAPSHOT</version>
   <name>Geronimo JWT Auth</name>
 
   <description>
@@ -37,7 +37,7 @@
     <connection>scm:git:https://gitbox.apache.org/repos/asf/geronimo-jwt-auth.git</connection>
     <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/geronimo-jwt-auth.git</developerConnection>
     <url>https://gitbox.apache.org/repos/asf/geronimo-jwt-auth.git</url>
-    <tag>geronimo-jwt-auth-1.0.0</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <properties>
