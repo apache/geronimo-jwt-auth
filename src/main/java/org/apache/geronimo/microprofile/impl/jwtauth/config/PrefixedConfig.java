@@ -28,6 +28,9 @@ class PrefixedConfig implements GeronimoJwtAuthConfig {
 
     @Override
     public String read(final String value, final String def) {
+        if (value.startsWith("mp.")) {
+            return delegate.read(value, def);
+        }
         return delegate.read("geronimo.jwt-auth." + value, def);
     }
 }
