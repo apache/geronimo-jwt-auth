@@ -40,7 +40,7 @@ public class JwtRequest extends HttpServletRequestWrapper {
     private final Supplier<JsonWebToken> tokenExtractor;
     private volatile JsonWebToken token; // cache for perf reasons
 
-    JwtRequest(final JwtParser service, final String header, final String prefix, final HttpServletRequest request) {
+    public JwtRequest(final JwtParser service, final String header, final String prefix, final HttpServletRequest request) {
         super(request);
         this.delegate = request;
 
