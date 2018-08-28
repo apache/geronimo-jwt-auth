@@ -45,8 +45,8 @@ public class DateValidator {
         issuedAtTimeMandatory = Boolean.parseBoolean(config.read("iat.required", "true"));
         tolerance = Long.parseLong(config.read("date.tolerance",
                 Long.toString(ofNullable(config.read("org.eclipse.microprofile.authentication.JWT.clockSkew", null))
-                        .map(Long::parseLong).map(it -> it * 1000)
-                        .orElse(60000L))));
+                        .map(Long::parseLong)
+                        .orElse(60L))));
     }
 
     void checkInterval(final JsonObject payload) {
