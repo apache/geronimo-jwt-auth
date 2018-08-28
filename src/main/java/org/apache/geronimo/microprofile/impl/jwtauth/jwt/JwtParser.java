@@ -31,6 +31,7 @@ import javax.json.JsonReaderFactory;
 import javax.json.JsonString;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
+import org.apache.geronimo.microprofile.impl.jwtauth.cdi.GeronimoJwtAuthExtension;
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
 import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -48,6 +49,9 @@ public class JwtParser {
 
     @Inject
     private SignatureValidator signatureValidator;
+
+    @Inject
+    private GeronimoJwtAuthExtension extension;
 
     private JsonReaderFactory readerFactory;
 
@@ -91,6 +95,10 @@ public class JwtParser {
         }
         signatureValidator.verifySignature(alg, kidMapper.loadKey(kid), jwt.substring(0, secondDot), jwt.substring(secondDot + 1));
 
+        return createToken(jwt, payload);
+    }
+
+    public GeronimoJsonWebToken createToken(final String jwt, final JsonObject payload) {
         return new GeronimoJsonWebToken(jwt, payload);
     }
 

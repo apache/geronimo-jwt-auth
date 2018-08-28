@@ -80,7 +80,7 @@ public class GeronimoJwtAuthFilter implements Filter {
 
         try {
             final JwtRequest req = new JwtRequest(service, headerName, prefix, httpServletRequest);
-            extension.execute(req, () -> chain.doFilter(req, response));
+            extension.execute(req.asTokenAccessor(), () -> chain.doFilter(req, response));
         } catch (final Exception e) { // when not used with JAX-RS but directly Servlet
             final HttpServletResponse httpServletResponse = HttpServletResponse.class.cast(response);
             if (!httpServletResponse.isCommitted()) {

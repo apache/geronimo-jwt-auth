@@ -35,14 +35,12 @@ import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
 import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtParser;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
-public class JwtRequest extends HttpServletRequestWrapper {
-    private final HttpServletRequest delegate;
+public class JwtRequest extends HttpServletRequestWrapper implements TokenAccessor {
     private final Supplier<JsonWebToken> tokenExtractor;
     private volatile JsonWebToken token; // cache for perf reasons
 
     public JwtRequest(final JwtParser service, final String header, final String prefix, final HttpServletRequest request) {
         super(request);
-        this.delegate = request;
 
         this.tokenExtractor = () -> {
             if (token != null) {
@@ -54,7 +52,7 @@ public class JwtRequest extends HttpServletRequestWrapper {
                     return token;
                 }
 
-                final String auth = delegate.getHeader(header);
+                final String auth = getHeader(header);
                 if (auth == null || auth.isEmpty()) {
                     throw new JwtException("No " + header + " header", HttpServletResponse.SC_UNAUTHORIZED);
                 }
@@ -81,6 +79,11 @@ public class JwtRequest extends HttpServletRequestWrapper {
         });
     }
 
+    public TokenAccessor asTokenAccessor() {
+        return this;
+    }
+
+    @Override
     public JsonWebToken getToken() {
         return tokenExtractor.get();
     }

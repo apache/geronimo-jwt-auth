@@ -63,6 +63,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
 import org.apache.geronimo.microprofile.impl.jwtauth.jwt.ContextualJsonWebToken;
+import org.apache.geronimo.microprofile.impl.jwtauth.servlet.TokenAccessor;
 import org.apache.geronimo.microprofile.impl.jwtauth.servlet.JwtRequest;
 import org.eclipse.microprofile.jwt.Claim;
 import org.eclipse.microprofile.jwt.ClaimValue;
@@ -70,7 +71,7 @@ import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 public class GeronimoJwtAuthExtension implements Extension {
-    private final ThreadLocal<JwtRequest> request = new ThreadLocal<>();
+    private final ThreadLocal<TokenAccessor> request = new ThreadLocal<>();
 
     private final Collection<Injection> injectionPoints = new HashSet<>(8);
     private final Collection<Throwable> errors = new ArrayList<>();
@@ -106,7 +107,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 .qualifiers(Default.Literal.INSTANCE, Any.Literal.INSTANCE)
                 .scope(ApplicationScoped.class)
                 .createWith(ctx -> new ContextualJsonWebToken(() -> {
-                    final JwtRequest request = this.request.get();
+                    final TokenAccessor request = this.request.get();
                     if (request == null) {
                         throw new IllegalStateException("No JWT in this request");
                     }
@@ -143,7 +144,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                     return createInjection(claim, arg)
                             .map(it -> new Injection(claim.value(), claim.standard(), type) {
                                 @Override
-                                Object createInstance(final JwtRequest jwtRequest) {
+                                Object createInstance(final TokenAccessor jwtRequest) {
                                     return ofNullable(it.createInstance(jwtRequest));
                                 }
                             });
@@ -153,7 +154,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                     return createInjection(claim, arg)
                             .map(it -> new Injection(claim.value(), claim.standard(), type) {
                                 @Override
-                                Object createInstance(final JwtRequest jwtRequest) {
+                                Object createInstance(final TokenAccessor jwtRequest) {
                                     return new ClaimValue<Object>() {
                                         @Override
                                         public String getName() {
@@ -178,7 +179,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 if (JsonString.class.isAssignableFrom(clazz)) {
                     return of(new Injection(claim.value(), claim.standard(), clazz) {
                         @Override
-                        Object createInstance(final JwtRequest jwtRequest) {
+                        Object createInstance(final TokenAccessor jwtRequest) {
                             final Object instance = super.createInstance(jwtRequest);
                             if (JsonString.class.isInstance(instance)) {
                                 return instance;
@@ -190,7 +191,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 if (JsonNumber.class.isAssignableFrom(clazz)) {
                     return of(new Injection(claim.value(), claim.standard(), clazz) {
                         @Override
-                        Object createInstance(final JwtRequest jwtRequest) {
+                        Object createInstance(final TokenAccessor jwtRequest) {
                             final Object instance = super.createInstance(jwtRequest);
                             if (JsonNumber.class.isInstance(instance)) {
                                 return instance;
@@ -205,7 +206,7 @@ public class GeronimoJwtAuthExtension implements Extension {
                 if (JsonArray.class.isAssignableFrom(clazz)) {
                     return of(new Injection(claim.value(), claim.standard(), clazz) {
                         @Override
-                        Object createInstance(final JwtRequest jwtRequest) {
+                        Object createInstance(final TokenAccessor jwtRequest) {
                             final Object instance = super.createInstance(jwtRequest);
                             if (instance == null) {
                                 return null;
@@ -260,7 +261,7 @@ public class GeronimoJwtAuthExtension implements Extension {
 
     public void execute(final HttpServletRequest req, final ServletRunnable task) {
         try {
-            final JwtRequest jwtRequest = requireNonNull(JwtRequest.class.isInstance(req) ?
+            final TokenAccessor jwtRequest = requireNonNull(JwtRequest.class.isInstance(req) ?
                             JwtRequest.class.cast(req) : JwtRequest.class.cast(req.getAttribute(JwtRequest.class.getName())),
                     "No JwtRequest");
             execute(jwtRequest, task);
@@ -269,7 +270,7 @@ public class GeronimoJwtAuthExtension implements Extension {
         }
     }
 
-    public void execute(final JwtRequest req, final ServletRunnable task) throws ServletException, IOException {
+    public void execute(final TokenAccessor req, final ServletRunnable task) throws ServletException, IOException {
         request.set(req); // we want to track it ourself to support propagation properly when needed
         try {
             task.run();
@@ -348,7 +349,7 @@ public class GeronimoJwtAuthExtension implements Extension {
             return new ClaimLiteral(name, claims);
         }
 
-        Object createInstance(final JwtRequest jwtRequest) {
+        Object createInstance(final TokenAccessor jwtRequest) {
             return transformer.apply(jwtRequest.getToken().getClaim(runtimeName));
         }
 
