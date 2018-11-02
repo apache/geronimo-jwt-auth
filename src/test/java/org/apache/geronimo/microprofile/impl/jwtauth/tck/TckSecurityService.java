@@ -16,6 +16,8 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.tck;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.security.Principal;
 import java.util.function.Supplier;
 
@@ -23,12 +25,21 @@ import javax.enterprise.inject.spi.CDI;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.webbeans.corespi.security.SimpleSecurityService;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 
 // to drop upgrading MW
 public class TckSecurityService extends SimpleSecurityService {
     @Override
     public Principal getCurrentPrincipal() {
-        return ((Supplier<Principal>) CDI.current().select(HttpServletRequest.class).get()
-                .getAttribute(Principal.class.getName() + ".supplier")).get();
+        return Principal.class.cast(Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
+                new Class<?>[]{Principal.class, JsonWebToken.class},
+                (proxy, method, args) -> {
+                    try {
+                        return method.invoke(((Supplier<Principal>) CDI.current().select(HttpServletRequest.class).get()
+                                .getAttribute(Principal.class.getName() + ".supplier")).get(), args);
+                    } catch (final InvocationTargetException ite) {
+                        throw ite.getTargetException();
+                    }
+                }));
     }
 }
