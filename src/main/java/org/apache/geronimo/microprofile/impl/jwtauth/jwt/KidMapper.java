@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -96,8 +95,8 @@ public class KidMapper {
         return value;
     }
 
-    Stream<String> loadIssuers(final String property) {
-        return issuerMapping.getOrDefault(property, defaultIssuers).stream();
+    Collection<String> loadIssuers(final String property) {
+        return issuerMapping.getOrDefault(property, defaultIssuers);
     }
 
     private String tryLoad(final String value) {

@@ -21,6 +21,7 @@ import static java.util.Collections.emptyMap;
 import java.io.ByteArrayInputStream;
 import java.net.HttpURLConnection;
 import java.util.Base64;
+import java.util.Collection;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -90,7 +91,8 @@ public class JwtParser {
 
         final String alg = getAttribute(header, "alg", defaultAlg);
         final String kid = getAttribute(header, "kid", defaultKid);
-        if (kidMapper.loadIssuers(kid).noneMatch(it -> it.equals(payload.getString(Claims.iss.name())))) {
+        final Collection<String> issuers = kidMapper.loadIssuers(kid);
+        if (!issuers.isEmpty() && issuers.stream().noneMatch(it -> it.equals(payload.getString(Claims.iss.name())))) {
             throw new JwtException("Invalid issuer", HttpURLConnection.HTTP_UNAUTHORIZED);
         }
         signatureValidator.verifySignature(alg, kidMapper.loadKey(kid), jwt.substring(0, secondDot), jwt.substring(secondDot + 1));
