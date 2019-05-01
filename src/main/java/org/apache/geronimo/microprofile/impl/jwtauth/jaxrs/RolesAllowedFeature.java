@@ -63,6 +63,14 @@ public class RolesAllowedFeature implements DynamicFeature {
             return;
         }
 
+        try {
+            ofNullable(RolesAllowedFeature.class.getClassLoader())
+                    .orElseGet(ClassLoader::getSystemClassLoader)
+                    .loadClass("javax.annotation.security.PermitAll");
+        } catch (final ClassNotFoundException cnfe) {
+            return;
+        }
+
         final boolean denyAll = methodAnnotations.containsKey(DenyAll.class) || (methodAnnotations.isEmpty() && classAnnotations.containsKey(DenyAll.class));
         final boolean permitAll = !denyAll && (methodAnnotations.containsKey(PermitAll.class) || (methodAnnotations.isEmpty() && classAnnotations.containsKey(PermitAll.class)));
         final Collection<String> roles = denyAll || permitAll ?

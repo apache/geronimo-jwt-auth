@@ -25,8 +25,10 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import javax.security.auth.Subject;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
@@ -39,7 +41,8 @@ public class JwtRequest extends HttpServletRequestWrapper implements TokenAccess
     private final Supplier<JsonWebToken> tokenExtractor;
     private volatile JsonWebToken token; // cache for perf reasons
 
-    public JwtRequest(final JwtParser service, final String header, final String prefix, final HttpServletRequest request) {
+    public JwtRequest(final JwtParser service, final String header, final String cookie,
+                      final String prefix, final HttpServletRequest request) {
         super(request);
 
         this.tokenExtractor = () -> {
@@ -52,14 +55,30 @@ public class JwtRequest extends HttpServletRequestWrapper implements TokenAccess
                     return token;
                 }
 
-                final String auth = getHeader(header);
+                boolean fromHeader = true;
+                String auth = getHeader(header);
+                if (auth == null) {
+                    final Cookie[] cookies = getCookies();
+                    if (cookies != null) {
+                        fromHeader = false;
+                        auth = Stream.of(cookies)
+                            .filter(it -> cookie.equalsIgnoreCase(it.getName()))
+                            .findFirst()
+                            .map(Cookie::getValue)
+                            .orElse(null);
+                    }
+                }
                 if (auth == null || auth.isEmpty()) {
                     throw new JwtException("No " + header + " header", HttpServletResponse.SC_UNAUTHORIZED);
                 }
-                if (!auth.toLowerCase(Locale.ROOT).startsWith(prefix)) {
-                    throw new JwtException("No prefix " + prefix + " in header " + header, HttpServletResponse.SC_UNAUTHORIZED);
+                if (fromHeader) {
+                    if (!auth.toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                        throw new JwtException("No prefix " + prefix + " in header " + header, HttpServletResponse.SC_UNAUTHORIZED);
+                    }
+                    token = service.parse(auth.substring(prefix.length()));
+                } else {
+                    token = service.parse(auth.startsWith(prefix) ? auth.substring(prefix.length()) : auth);
                 }
-                token = service.parse(auth.substring(prefix.length()));
                 setAttribute(JsonWebToken.class.getName(), token);
                 return token;
             }

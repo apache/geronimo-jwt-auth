@@ -43,6 +43,7 @@ and if not system properties and `META-INF/geronimo/microprofile/jwt-auth.proper
 |geronimo.jwt-auth.kids.key.mapping|The mapping between the kid and the public key to use|-
 |geronimo.jwt-auth.kids.issuer.mapping|The mapping of the issuer expected per kid|-
 |geronimo.jwt-auth.issuer.default|The default issuer to use when no mapping is found|-
+|geronimo.jwt-auth.cookie.name|The cookie name to read the JWT, note that header is read before in any case.|Bearer
 |geronimo.jwt-auth.header.name|The header name to read the JWT|Authorization
 |geronimo.jwt-auth.header.prefix|The header prefix to use|bearer
 |geronimo.jwt-auth.header.alg.supported|List of accepted `alg` value|RS256, accepted values: [RS\|HS][256\|384\|512]
