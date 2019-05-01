@@ -34,16 +34,19 @@ import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
+import org.apache.geronimo.microprofile.impl.jwtauth.jaxrs.JAXRSRequestForwarder;
 import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtParser;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 public class JwtRequest extends HttpServletRequestWrapper implements TokenAccessor {
     private final Supplier<JsonWebToken> tokenExtractor;
+    private final String headerName;
     private volatile JsonWebToken token; // cache for perf reasons
 
     public JwtRequest(final JwtParser service, final String header, final String cookie,
                       final String prefix, final HttpServletRequest request) {
         super(request);
+        this.headerName = header;
 
         this.tokenExtractor = () -> {
             if (token != null) {
@@ -56,7 +59,11 @@ public class JwtRequest extends HttpServletRequestWrapper implements TokenAccess
                 }
 
                 boolean fromHeader = true;
-                String auth = getHeader(header);
+                String auth = String.class.cast(
+                    getAttribute("org.apache.geronimo.microprofile.impl.jwtauth.jaxrs.JAXRSRequestForwarder.header"));
+                if (auth == null) {
+                    auth = getHeader(header);
+                }
                 if (auth == null) {
                     final Cookie[] cookies = getCookies();
                     if (cookies != null) {
@@ -96,6 +103,10 @@ public class JwtRequest extends HttpServletRequestWrapper implements TokenAccess
             principals.addAll(namePrincipal.getGroups().stream().map(role -> (Principal) () -> role).collect(toList()));
             return new Subject(true, principals, emptySet(), emptySet());
         });
+    }
+
+    public String getHeaderName() {
+        return headerName;
     }
 
     public TokenAccessor asTokenAccessor() {
