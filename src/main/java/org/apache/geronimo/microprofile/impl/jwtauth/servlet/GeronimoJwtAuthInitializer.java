@@ -21,13 +21,11 @@ import static java.util.Optional.ofNullable;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContainerInitializer;
 import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.annotation.HandlesTypes;
 import javax.ws.rs.ApplicationPath;
@@ -39,25 +37,20 @@ import org.eclipse.microprofile.auth.LoginConfig;
 @HandlesTypes(LoginConfig.class)
 public class GeronimoJwtAuthInitializer implements ServletContainerInitializer {
     @Override
-    public void onStartup(final Set<Class<?>> classes, final ServletContext ctx) throws ServletException {
+    public void onStartup(final Set<Class<?>> classes, final ServletContext ctx) {
         final GeronimoJwtAuthConfig config = GeronimoJwtAuthConfig.create();
         final boolean forceSetup = "true".equalsIgnoreCase(config.read("filter.active", "false"));
         if (forceSetup) {
             doSetup(ctx, config, null);
             return;
         }
-        ofNullable(classes).filter(c -> !c.isEmpty()).ifPresent(marked -> // needed? what's the issue dropping it?
-                // nothing normally
-                // to be deterministic
-                marked.stream()
-                      .filter(Application.class::isAssignableFrom) // needed? what's the issue dropping it? nothing
-                      // normally
-                      .filter(app -> forceSetup ||
-                              (app.isAnnotationPresent(LoginConfig.class) && "MP-JWT".equalsIgnoreCase(app.getAnnotation(LoginConfig.class).authMethod())))
-                      .min(Comparator.comparing(Class::getName))
-                .ifPresent(app -> {
-                    doSetup(ctx, config, app);
-                }));
+        ofNullable(classes).filter(c -> !c.isEmpty())
+                .flatMap(marked -> marked.stream()
+                    .filter(Application.class::isAssignableFrom) // needed? what's the issue dropping it? nothing normally
+                    .filter(app -> app.isAnnotationPresent(LoginConfig.class) &&
+                            "MP-JWT".equalsIgnoreCase(app.getAnnotation(LoginConfig.class).authMethod()))
+                    .min(Comparator.comparing(Class::getName)))  // to be deterministic
+                .ifPresent(app -> doSetup(ctx, config, app));
     }
 
     private void doSetup(final ServletContext ctx, final GeronimoJwtAuthConfig config, final Class<?> app) {

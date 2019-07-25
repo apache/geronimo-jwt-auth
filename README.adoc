@@ -108,3 +108,8 @@ public class MySecurityService extends SimpleSecurityService {
 ----
 
 IMPORTANT: in any case it is not recommended to use CDI `Principal` API, always prefer `JsonWebToken` one.
+
+== Run-as
+
+To enable a "run as" feature - i.e. don't go through the JWT validation etc but still propagate a JWT considered as valid,
+you can set the servlet attribute `org.eclipse.microprofile.jwt.JsonWebToken` with an implementation of that API.

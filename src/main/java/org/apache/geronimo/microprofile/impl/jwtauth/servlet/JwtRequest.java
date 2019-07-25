@@ -34,7 +34,6 @@ import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.JwtException;
-import org.apache.geronimo.microprofile.impl.jwtauth.jaxrs.JAXRSRequestForwarder;
 import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtParser;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
@@ -55,6 +54,14 @@ public class JwtRequest extends HttpServletRequestWrapper implements TokenAccess
 
             synchronized (this) {
                 if (token != null) {
+                    return token;
+                }
+
+                final Object existing = getAttribute(JsonWebToken.class.getName());
+                if (existing != null) {
+                    token = JsonWebToken.class.isInstance(existing) ?
+                            JsonWebToken.class.cast(existing) :
+                            service.parse(String.valueOf(existing));
                     return token;
                 }
 
