@@ -33,7 +33,7 @@ import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfi
 import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
 
 @ApplicationScoped
-class GroupMapper {
+public class GroupMapper {
     @Inject
     private GeronimoJwtAuthConfig config;
 
