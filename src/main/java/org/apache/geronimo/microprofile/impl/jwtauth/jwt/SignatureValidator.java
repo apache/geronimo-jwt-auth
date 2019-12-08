@@ -63,7 +63,7 @@ public class SignatureValidator {
         jcaProvider = config.read("jca.provider", null);
     }
 
-    void verifySignature(final String alg, final String key, final String signingString, final String expected) {
+    public void verifySignature(final String alg, final String key, final String signingString, final String expected) {
         final String normalizedAlg = alg.toLowerCase(Locale.ROOT);
         if (!supportedAlgorithms.contains(normalizedAlg)) {
             throw new JwtException("Unsupported algorithm", HttpURLConnection.HTTP_UNAUTHORIZED);
