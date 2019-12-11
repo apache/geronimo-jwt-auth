@@ -82,7 +82,7 @@ public class KidMapper {
         defaultKey = config.read("public-key.default", config.read(Names.VERIFIER_PUBLIC_KEY, null));
     }
 
-    String loadKey(final String property) {
+    public String loadKey(final String property) {
         String value = keyMapping.get(property);
         if (value == null) {
             value = tryLoad(property);
@@ -95,7 +95,7 @@ public class KidMapper {
         return value;
     }
 
-    Collection<String> loadIssuers(final String property) {
+    public Collection<String> loadIssuers(final String property) {
         return issuerMapping.getOrDefault(property, defaultIssuers);
     }
 
