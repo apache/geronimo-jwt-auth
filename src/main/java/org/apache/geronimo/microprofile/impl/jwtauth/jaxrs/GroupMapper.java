@@ -52,7 +52,7 @@ public class GroupMapper {
 
     }
 
-    Collection<String> map(final String tokenName) {
+    public Collection<String> map(final String tokenName) {
         return ofNullable(mapping.get(tokenName)).orElse(singletonList(tokenName));
     }
 }
