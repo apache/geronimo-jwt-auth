@@ -54,6 +54,9 @@ public class JwtParser {
     @Inject
     private GeronimoJwtAuthExtension extension;
 
+    @Inject
+    private JwtPatcher patcher;
+
     private JsonReaderFactory readerFactory;
 
     private String defaultKid;
@@ -86,11 +89,12 @@ public class JwtParser {
             throw new JwtException("Invalid typ", HttpURLConnection.HTTP_UNAUTHORIZED);
         }
 
-        final JsonObject payload = loadJson(jwt.substring(firstDot + 1, secondDot));
+        final String kid = getAttribute(header, "kid", defaultKid);
+
+        final JsonObject payload = patcher.patch(defaultKid.equals(kid) ? null : kid, loadJson(jwt.substring(firstDot + 1, secondDot)));
         dateValidator.checkInterval(payload);
 
         final String alg = getAttribute(header, "alg", defaultAlg);
-        final String kid = getAttribute(header, "kid", defaultKid);
         final Collection<String> issuers = kidMapper.loadIssuers(kid);
         if (!issuers.isEmpty() && issuers.stream().noneMatch(it -> it.equals(payload.getString(Claims.iss.name())))) {
             throw new JwtException("Invalid issuer", HttpURLConnection.HTTP_UNAUTHORIZED);
