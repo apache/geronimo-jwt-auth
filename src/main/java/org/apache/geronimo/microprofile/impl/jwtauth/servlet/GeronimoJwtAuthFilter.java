@@ -41,6 +41,7 @@ import org.apache.geronimo.microprofile.impl.jwtauth.jwt.JwtParser;
 public class GeronimoJwtAuthFilter implements Filter {
     private String headerName;
     private String cookieName;
+    private String groupsName;
     private String prefix;
     private JwtParser service;
     private GeronimoJwtAuthExtension extension;
@@ -55,6 +56,7 @@ public class GeronimoJwtAuthFilter implements Filter {
         final GeronimoJwtAuthConfig config = current.select(GeronimoJwtAuthConfig.class).get();
         headerName = config.read("header.name", "Authorization");
         cookieName = config.read("cookie.name", "Bearer");
+        groupsName = config.read("groups.name",  "");
         prefix = Optional.of(config.read("header.prefix", "bearer"))
                 .filter(s -> !s.isEmpty()).map(s -> s + " ")
                 .orElse("");
@@ -81,7 +83,7 @@ public class GeronimoJwtAuthFilter implements Filter {
         }
 
         try {
-            final JwtRequest req = new JwtRequest(service, headerName, cookieName, prefix, httpServletRequest);
+            final JwtRequest req = new JwtRequest(service, headerName, cookieName, groupsName, prefix, httpServletRequest);
             extension.execute(req.asTokenAccessor(), () -> chain.doFilter(req, response));
         } catch (final Exception e) { // when not used with JAX-RS but directly Servlet
             final HttpServletResponse httpServletResponse = HttpServletResponse.class.cast(response);
