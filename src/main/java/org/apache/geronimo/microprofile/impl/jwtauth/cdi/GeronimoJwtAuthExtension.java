@@ -77,20 +77,20 @@ public class GeronimoJwtAuthExtension implements Extension {
     private final Collection<Throwable> errors = new ArrayList<>();
     private JsonProvider json;
 
-    void setClaimMethodsBinding(@Observes final BeforeBeanDiscovery beforeBeanDiscovery) {
+    public void setClaimMethodsBinding(@Observes final BeforeBeanDiscovery beforeBeanDiscovery) {
         beforeBeanDiscovery.configureQualifier(Claim.class)
                 .methods().forEach(m -> m.remove(it -> it.annotationType() == Nonbinding.class));
         json = JsonProvider.provider();
     }
 
-    void captureInjections(@Observes final ProcessInjectionPoint<?, ?> processInjectionPoint) {
+    public void captureInjections(@Observes final ProcessInjectionPoint<?, ?> processInjectionPoint) {
         final InjectionPoint injectionPoint = processInjectionPoint.getInjectionPoint();
         ofNullable(injectionPoint.getAnnotated().getAnnotation(Claim.class))
                 .flatMap(claim -> createInjection(claim, injectionPoint.getType()))
                 .ifPresent(injectionPoints::add);
     }
 
-    void addClaimBeans(@Observes final AfterBeanDiscovery afterBeanDiscovery) {
+    public void addClaimBeans(@Observes final AfterBeanDiscovery afterBeanDiscovery) {
         // it is another instance than th eone used in our initializer but it should be backed by the same impl
         afterBeanDiscovery.addBean()
                 .id(GeronimoJwtAuthExtension.class.getName() + "#" + GeronimoJwtAuthConfig.class.getName())
@@ -126,7 +126,7 @@ public class GeronimoJwtAuthExtension implements Extension {
         injectionPoints.clear();
     }
 
-    void afterDeployment(@Observes final AfterDeploymentValidation afterDeploymentValidation) {
+    public void afterDeployment(@Observes final AfterDeploymentValidation afterDeploymentValidation) {
         errors.forEach(afterDeploymentValidation::addDeploymentProblem);
     }
 

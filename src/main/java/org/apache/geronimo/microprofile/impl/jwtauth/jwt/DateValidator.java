@@ -49,7 +49,7 @@ public class DateValidator {
                         .orElse(60L))));
     }
 
-    void checkInterval(final JsonObject payload) {
+    public void checkInterval(final JsonObject payload) {
         long now = -1;
 
         final JsonNumber exp = payload.getJsonNumber(Claims.exp.name());
