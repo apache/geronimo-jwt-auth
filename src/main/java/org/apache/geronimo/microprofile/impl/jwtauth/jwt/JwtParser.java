@@ -91,7 +91,7 @@ public class JwtParser {
 
         final String kid = getAttribute(header, "kid", defaultKid);
 
-        final JsonObject payload = patcher.patch(defaultKid.equals(kid) ? null : kid, loadJson(jwt.substring(firstDot + 1, secondDot)));
+        final JsonObject payload = patcher.patch(kid.equals(defaultKid) ? null : kid, loadJson(jwt.substring(firstDot + 1, secondDot)));
         dateValidator.checkInterval(payload);
 
         final String alg = getAttribute(header, "alg", defaultAlg);
