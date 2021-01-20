@@ -46,7 +46,7 @@ public class JwtPatcher {
     @PostConstruct
     private void init() {
         readerFactory = Json.createReaderFactory(emptyMap());
-        defaultPatch = ofNullable(config.read("jwt.header.jwt.payload.patch.default", null))
+        defaultPatch = ofNullable(config.read("jwt.payload.patch.default", null))
                 .map(it -> {
                     try (final JsonReader reader = readerFactory.createReader(new StringReader(it))) {
                         return reader.readArray();
@@ -75,9 +75,7 @@ public class JwtPatcher {
     }
 
     protected /*can be overriden to be lazy*/ JsonPatch getPatch(final String kid) {
-        if (kid == null) {
-            return defaultPatch;
-        }
-        return kid == null ? defaultPatch : patches.get(kid);
+        JsonPatch jsonPatch = patches.get(kid);
+        return jsonPatch == null ? defaultPatch : jsonPatch;
     }
 }
