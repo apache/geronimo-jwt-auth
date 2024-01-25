@@ -53,6 +53,7 @@ and if not system properties and `META-INF/geronimo/microprofile/jwt-auth.proper
 |geronimo.jwt-auth.jca.provider|The JCA provider (java security)|- (built-in one)
 |geronimo.jwt-auth.groups.mapping|The mapping for the groups|-
 |geronimo.jwt-auth.public-key.cache.active|Should public keys be cached|true
+|geronimo.jwt-auth.jwks.invalidationInterval|Invalidation interval in seconds|-
 |geronimo.jwt-auth.public-key.default|Default public key to verify JWT|-
 |===
 

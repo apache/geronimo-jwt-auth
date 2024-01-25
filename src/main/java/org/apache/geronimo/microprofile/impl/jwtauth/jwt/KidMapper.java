@@ -16,43 +16,65 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Optional.ofNullable;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
+import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
+import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
+import org.eclipse.microprofile.jwt.config.Names;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.JsonReaderFactory;
+import javax.json.JsonValue;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-
-import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
-import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
-import org.eclipse.microprofile.jwt.config.Names;
 
 @ApplicationScoped
 public class KidMapper {
     @Inject
     private GeronimoJwtAuthConfig config;
 
-    private final ConcurrentMap<String, String> keyMapping = new ConcurrentHashMap<>();
+    private ConcurrentMap<String, String> keyMapping = new ConcurrentHashMap<>();
     private final Map<String, Collection<String>> issuerMapping = new HashMap<>();
     private String defaultKey;
+    private String jwksUrl;
     private Set<String> defaultIssuers;
-
+    private JsonReaderFactory readerFactory;
+    private CompletableFuture<Void> reloadJwksRequest;
+    HttpClient httpClient;
+    ScheduledExecutorService backgroundThread;
     @PostConstruct
     private void init() {
         ofNullable(config.read("kids.key.mapping", null))
@@ -79,7 +101,46 @@ public class KidMapper {
                                     .collect(Collectors.toSet()))
                                 .orElseGet(HashSet::new);
         ofNullable(config.read("issuer.default", config.read(Names.ISSUER, null))).ifPresent(defaultIssuers::add);
+        jwksUrl = config.read("mp.jwt.verify.publickey.location", null);
+        readerFactory = Json.createReaderFactory(emptyMap());
+        ofNullable(jwksUrl).ifPresent(url -> {
+            HttpClient.Builder builder = HttpClient.newBuilder();
+            if (getJwksRefreshInterval() != null) {
+                long secondsRefresh = getJwksRefreshInterval();
+                backgroundThread = Executors.newSingleThreadScheduledExecutor();
+                builder.executor(backgroundThread);
+                backgroundThread.scheduleAtFixedRate(this::reloadRemoteKeys, getJwksRefreshInterval(), secondsRefresh, SECONDS);
+            }
+            httpClient = builder.build();
+            reloadJwksRequest = reloadRemoteKeys();// inital load, otherwise the background thread is too slow to start and serve
+        });
         defaultKey = config.read("public-key.default", config.read(Names.VERIFIER_PUBLIC_KEY, null));
+    }
+
+    private Integer getJwksRefreshInterval() {
+        String interval = config.read("jwks.invalidation.interval",null);
+        if (interval != null) {
+            return Integer.parseInt(interval);
+        } else {
+            return null;
+        }
+    }
+
+    private CompletableFuture<Void> reloadRemoteKeys() {
+        HttpRequest request = HttpRequest.newBuilder().GET().uri(URI.create(jwksUrl)).header("Accept", "application/json").build();
+        CompletableFuture<HttpResponse<String>> httpResponseCompletableFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        CompletableFuture<Void> ongoingRequest = httpResponseCompletableFuture.thenApply(result -> {
+            List<JWK> jwks = parseKeys(result);
+            ConcurrentHashMap<String, String> newKeys = new ConcurrentHashMap<>();
+            jwks.forEach(key -> newKeys.put(key.getKid(), key.toPemKey()));
+            keyMapping = newKeys;
+            return null;
+        });
+
+        ongoingRequest.thenRun(() -> {
+            reloadJwksRequest = ongoingRequest;
+        });
+        return ongoingRequest;
     }
 
     public String loadKey(final String property) {
@@ -120,7 +181,44 @@ public class KidMapper {
             throw new IllegalArgumentException(e);
         }
 
-        // else direct value
+        // load jwks via url
+        if (jwksUrl != null) {
+            if(reloadJwksRequest != null) {
+                try {
+                    reloadJwksRequest.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+                String key = keyMapping.get(value);
+                if (key != null) {
+                    return key;
+                }
+
+        }
         return value;
     }
+
+    private List<JWK> parseKeys(HttpResponse<String> keyResponse) {
+        StringReader stringReader = new StringReader(keyResponse.body());
+        JsonReader jwksReader = readerFactory.createReader(stringReader);
+        JsonObject keySet = jwksReader.readObject();
+        JsonArray keys = keySet.getJsonArray("keys");
+        return keys.stream()
+                .map(JsonValue::asJsonObject)
+                .map(JWK::new)
+                .filter(it -> it.getUse() == null || "sig".equals(it.getUse()))
+                .collect(toList());
+    }
+
+    @PreDestroy
+    private void destroy() {
+        if (backgroundThread != null) {
+            backgroundThread.shutdown();
+        }
+        if (reloadJwksRequest != null) {
+            reloadJwksRequest.cancel(true);
+        }
+    }
+
 }
