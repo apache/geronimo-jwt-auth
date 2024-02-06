@@ -1,5 +1,6 @@
 package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 
+import static javax.ws.rs.client.ClientBuilder.newClient;
 import static org.testng.Assert.assertEquals;
 
 import java.io.BufferedReader;
@@ -8,85 +9,118 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URISyntaxException;
+import java.net.URL;
 
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+
+import org.jboss.arquillian.container.test.api.Deployment;
+import org.jboss.arquillian.container.test.api.RunAsClient;
+import org.jboss.arquillian.test.api.ArquillianResource;
+import org.jboss.arquillian.testng.Arquillian;
+import org.jboss.shrinkwrap.api.ShrinkWrap;
+import org.jboss.shrinkwrap.api.spec.WebArchive;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-@Test()
-public class KidMapperTest {
+public class KidMapperTest extends Arquillian {
 
-	private Server jwksServer;
+	private static Server jwksServer;
 
-	@BeforeTest
-	void startJwksServer() throws IOException {
-		jwksServer = new Server();
-		jwksServer.start();
-	}
+    @Deployment()
+    public static WebArchive createDeployment() throws Exception {
+        jwksServer = new Server();
+        jwksServer.start();
+        System.setProperty("mp.jwt.verify.publickey.location", "http://localhost:" + jwksServer.getPort() + "/jwks.json");
+        return ShrinkWrap
+            .create(WebArchive.class)
+            .addAsWebInfResource("META-INF/beans.xml", "beans.xml")
+            .addClasses(JwtParser.class, KidMapper.class);
+    }
 
-	@AfterTest
-	void stopJwksServer() throws IOException {
-		jwksServer.stop();
-	}
+    @AfterClass
+    static void stopJwksServer() throws IOException {
+        jwksServer.stop();
+    }
 
-	@Test
-	void convertJwksetToPem() {
-		KidMapper kidMapper = new KidMapper();
-		String localJwksUrl = "http://localhost:" + jwksServer.getPort() + "/jwks.json";
-		kidMapper.config = (key, defaultValue) -> "verify.publickey.location".equals(key) ? localJwksUrl : null;
-		kidMapper.init();
+    @ArquillianResource
+    private URL serverUrl;
 
-		String key = kidMapper.loadKey("orange-1234");
-		String expectedKey = "-----BEGIN PUBLIC KEY-----MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCyzNurU19lqnYhx5QI72sIX1lh8cTehTmboC+DLG7UuaUHqs096M754HtP2IiHFcIQqwYNzHgKmjmfGdbk9JBkz/DNeDVsA5nc7qTnsSgULXTxwHSF286IJdco5kasaJm4Xurlm3V+2oiTugraBsi1J0Ht0OtHgJIlIaGxK7mY/QIDAQAB-----END PUBLIC KEY-----";
-		assertEquals(key, expectedKey);
-	}
+    @Test
+    @RunAsClient
+    void convertJwksetToPem() throws URISyntaxException {
+        String expectedKey = "-----BEGIN PUBLIC KEY-----MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCyzNurU19lqnYhx5QI72sIX1lh8cTehTmboC+DLG7UuaUHqs096M754HtP2IiHFcIQqwYNzHgKmjmfGdbk9JBkz/DNeDVsA5nc7qTnsSgULXTxwHSF286IJdco5kasaJm4Xurlm3V+2oiTugraBsi1J0Ht0OtHgJIlIaGxK7mY/QIDAQAB-----END PUBLIC KEY-----";
 
-	private static class Server {
+        String key = newClient().target(serverUrl.toURI()).path("public-keys").path("orange-1234").request().get(String.class);
+        
+        assertEquals(key, expectedKey);
+    }
 
-		private static final String HEADER = "HTTP/1.0 200 OK\r\nConnection: close\r\n";
+    @ApplicationScoped
+    @Path("public-keys")
+    public static class PublicKeyResource {
 
-		private ServerSocket serverSocket;
+        @Inject
+        private KidMapper kidMapper;
 
-		Server() throws IOException {
-			serverSocket = new ServerSocket(0);
-		}
+        @GET
+        @Path("{kid}")
+        @Produces()
+        public String getPublicKey(@PathParam("kid") String kid) {
+            return kidMapper.loadKey(kid);
+        }
+    }
 
-		int getPort() {
-			return serverSocket.getLocalPort();
-		}
+    private static class Server {
 
-		void start() {
-			Thread server = new Thread(() -> {
-				while (!serverSocket.isClosed()) {
-					try (Socket client = serverSocket.accept();
-							BufferedReader request = new BufferedReader(
-									new InputStreamReader(client.getInputStream()));
-							BufferedReader reader = new BufferedReader(
-									new InputStreamReader(getClass().getResourceAsStream(request.readLine().split("\\s")[1])));
-							PrintWriter writer = new PrintWriter(client.getOutputStream())) {
+        private static final String HEADER = "HTTP/1.0 200 OK\r\nConnection: close\r\n";
 
-						writer.println(HEADER);
-						writer.print(load(reader));
-					} catch (IOException e) {
-						if (!serverSocket.isClosed()) {
-							e.printStackTrace(System.err);
-						}
-					}
-				}
-			});
-			server.start();
-		}
+        private ServerSocket serverSocket;
 
-		void stop() throws IOException {
-			serverSocket.close();
-		}
+        Server() throws IOException {
+            serverSocket = new ServerSocket(0);
+        }
 
-		private String load(BufferedReader reader) throws IOException {
-			StringBuilder content = new StringBuilder();
-			for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-				content.append(line).append("\r\n");
-			}
-			return content.toString();
-		}
-	}
+        int getPort() {
+            return serverSocket.getLocalPort();
+        }
+
+        void start() {
+            Thread server = new Thread(() -> {
+                while (!serverSocket.isClosed()) {
+                    try (Socket client = serverSocket.accept();
+                            BufferedReader request = new BufferedReader(new InputStreamReader(client.getInputStream()));
+                            BufferedReader reader = new BufferedReader(new InputStreamReader(
+                                    getClass().getResourceAsStream(request.readLine().split("\\s")[1])));
+                            PrintWriter writer = new PrintWriter(client.getOutputStream())) {
+
+                        writer.println(HEADER);
+                        writer.print(load(reader));
+                    } catch (IOException e) {
+                        if (!serverSocket.isClosed()) {
+                            e.printStackTrace(System.err);
+                        }
+                    }
+                }
+            });
+            server.start();
+        }
+
+        void stop() throws IOException {
+            serverSocket.close();
+        }
+
+        private String load(BufferedReader reader) throws IOException {
+            StringBuilder content = new StringBuilder();
+            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                content.append(line).append("\r\n");
+            }
+            return content.toString();
+        }
+    }
 }

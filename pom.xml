@@ -46,11 +46,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.nimbusds</groupId>
-      <artifactId>nimbus-jose-jwt</artifactId>
-      <version>9.22</version>
-    </dependency>
-    <dependency>
       <groupId>org.eclipse.microprofile.jwt</groupId>
       <artifactId>microprofile-jwt-auth-api</artifactId>
       <version>${spec.version}</version>
@@ -173,6 +168,7 @@
         <version>2.21.0</version>
         <configuration>
           <suiteXmlFiles>
+            <suiteXmlFile>${project.basedir}/src/test/resources/geronimo.xml</suiteXmlFile>
             <suiteXmlFile>${project.basedir}/src/test/resources/tck.xml</suiteXmlFile>
           </suiteXmlFiles>
         </configuration>
