@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -151,8 +152,7 @@ public class KidMapper {
             try (InputStream connection = jwks.openStream(); JsonReader jwksReader = readerFactory.createReader(connection)) {
                 JsonObject keySet = jwksReader.readObject();
                 JsonArray keys = keySet.getJsonArray("keys");
-                List<JWK> parsedKeys = new ArrayList<>(keys.size());
-                keys.forEach(key -> parsedKeys.add(new JWK((JsonObject)key)));
+                List<JWK> parsedKeys = parseKeys(keys);
                 return parsedKeys;
             } catch (IOException e) {
                 throw new IllegalStateException(e);
@@ -160,5 +160,24 @@ public class KidMapper {
         } catch (MalformedURLException e) {
             throw new IllegalArgumentException(e);
         }
+    }
+
+    private List<JWK> parseKeys(JsonArray keys) {
+        List<JWK> parsedKeys = new ArrayList<>(keys.size());
+        keys.forEach(key -> {
+            JWK jwk = new JWK((JsonObject) key);
+            if (isSignatureKey(jwk)) {
+                parsedKeys.add(jwk);
+            }
+        });
+        return parsedKeys;
+    }
+
+    private boolean isSignatureKey(JWK key) {
+        Optional<String> use = key.getUse();
+        if (use.isPresent()) {
+            return use.get().equals("sig");
+        }
+        return true;
     }
 }

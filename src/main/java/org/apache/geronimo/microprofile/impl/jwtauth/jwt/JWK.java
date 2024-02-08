@@ -25,6 +25,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 import java.util.Base64.Decoder;
+import java.util.Optional;
 
 import javax.json.JsonObject;
 
@@ -34,12 +35,14 @@ public class JWK {
     private String kty;
     private String n;
     private String e;
+    private String use;
 
     public JWK(JsonObject jsonObject) {
         kid = jsonObject.getString("kid");
         kty = jsonObject.getString("kty");
         n = jsonObject.getString("n");
         e = jsonObject.getString("e");
+        use = jsonObject.getString("use", null);
     }
 
     public String getKid() {
@@ -50,13 +53,17 @@ public class JWK {
 		return kty;
 	}
 
-	public String getN() {
+    public String getN() {
 		return n;
-	}
+    }
 
-	public String getE() {
-		return e;
-	}
+    public String getE() {
+        return e;
+    }
+
+    public Optional<String> getUse() {
+        return Optional.ofNullable(use);
+    }
 
 	public String toPemKey() {
         PublicKey publicKey = toRSAPublicKey();
