@@ -19,6 +19,7 @@ package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 import static java.util.Collections.emptyMap;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,14 +29,7 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
@@ -48,6 +42,7 @@ import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
+import javax.json.JsonValue;
 import javax.json.JsonReaderFactory;
 
 import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
@@ -163,21 +158,11 @@ public class KidMapper {
     }
 
     private List<JWK> parseKeys(JsonArray keys) {
-        List<JWK> parsedKeys = new ArrayList<>(keys.size());
-        keys.forEach(key -> {
-            JWK jwk = new JWK((JsonObject) key);
-            if (isSignatureKey(jwk)) {
-                parsedKeys.add(jwk);
-            }
-        });
-        return parsedKeys;
+        return keys.stream()
+                .map(JsonValue::asJsonObject)
+                .map(JWK::new)
+                .filter(it -> it.getUse() == null || "sig".equals(it.getUse()))
+                .collect(toList());
     }
 
-    private boolean isSignatureKey(JWK key) {
-        Optional<String> use = key.getUse();
-        if (use.isPresent()) {
-            return use.get().equals("sig");
-        }
-        return true;
-    }
 }
