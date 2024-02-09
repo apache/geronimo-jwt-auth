@@ -16,24 +16,9 @@
  */
 package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
+import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
+import org.eclipse.microprofile.jwt.config.Names;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -42,12 +27,31 @@ import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
-import javax.json.JsonValue;
 import javax.json.JsonReaderFactory;
+import javax.json.JsonValue;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.apache.geronimo.microprofile.impl.jwtauth.config.GeronimoJwtAuthConfig;
-import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
-import org.eclipse.microprofile.jwt.config.Names;
+import static java.util.Collections.emptyMap;
+import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 @ApplicationScoped
 public class KidMapper {
@@ -60,6 +64,7 @@ public class KidMapper {
     private String jwksUrl;
     private Set<String> defaultIssuers;
     private JsonReaderFactory readerFactory;
+    private CompletableFuture<List<JWK>> jwkSetRequest;
 
     @PostConstruct
     private void init() {
@@ -88,6 +93,11 @@ public class KidMapper {
                                 .orElseGet(HashSet::new);
         ofNullable(config.read("issuer.default", config.read(Names.ISSUER, null))).ifPresent(defaultIssuers::add);
         jwksUrl = config.read("mp.jwt.verify.publickey.location", null);
+        ofNullable(jwksUrl).ifPresent(url -> {
+            HttpClient httpClient = HttpClient.newBuilder().build();
+            HttpRequest request = HttpRequest.newBuilder().GET().uri(URI.create(jwksUrl)).header("Accept", "application/json").build();
+            jwkSetRequest =  httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenApply(this::parseKeys);
+        });
         defaultKey = config.read("public-key.default", config.read(Names.VERIFIER_PUBLIC_KEY, null));
         readerFactory = Json.createReaderFactory(emptyMap());
     }
@@ -132,32 +142,24 @@ public class KidMapper {
 
         // load jwks via url
         if (jwksUrl != null) {
-            loadJwkSet(jwksUrl).forEach(jwk -> keyMapping.put(jwk.getKid(), jwk.toPemKey()));
-            String key = keyMapping.get(value);
-            if (key != null) {
-                return key;
+            try {
+                List<JWK> jwks = jwkSetRequest.get();
+                jwks.forEach(jwk -> keyMapping.put(jwk.getKid(), jwk.toPemKey()));
+                String key = keyMapping.get(value);
+                if (key != null) {
+                    return key;
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                // loading of jwks failed
             }
         }
         return value;
     }
 
-    private List<JWK> loadJwkSet(String url) {
-        try {
-            URL jwks = new URL(url);
-            try (InputStream connection = jwks.openStream(); JsonReader jwksReader = readerFactory.createReader(connection)) {
-                JsonObject keySet = jwksReader.readObject();
-                JsonArray keys = keySet.getJsonArray("keys");
-                List<JWK> parsedKeys = parseKeys(keys);
-                return parsedKeys;
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        } catch (MalformedURLException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    private List<JWK> parseKeys(JsonArray keys) {
+    private List<JWK> parseKeys(HttpResponse<String> keyResponse) {
+        JsonReader jwksReader = readerFactory.createReader(new StringReader(keyResponse.body()));
+        JsonObject keySet = jwksReader.readObject();
+        JsonArray keys = keySet.getJsonArray("keys");
         return keys.stream()
                 .map(JsonValue::asJsonObject)
                 .map(JWK::new)
