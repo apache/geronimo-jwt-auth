@@ -42,13 +42,13 @@ public class JWK {
     private String use;
 
     public JWK(JsonObject jsonObject) {
-        kid = jsonObject.getString("kid");
-        kty = jsonObject.getString("kty");
-        x = jsonObject.getString("x");
-        y = jsonObject.getString("y");
-        crv = jsonObject.getString("crv");
-        n = jsonObject.getString("n");
-        e = jsonObject.getString("e");
+        kid = jsonObject.getString("kid",null);
+        kty = jsonObject.getString("kty",null);
+        x = jsonObject.getString("x",null);
+        y = jsonObject.getString("y",null);
+        crv = jsonObject.getString("crv",null);
+        n = jsonObject.getString("n",null);
+        e = jsonObject.getString("e",null);
         use = jsonObject.getString("use", null);
     }
 

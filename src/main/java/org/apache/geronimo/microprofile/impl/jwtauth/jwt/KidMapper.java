@@ -21,6 +21,7 @@ import org.apache.geronimo.microprofile.impl.jwtauth.io.PropertiesLoader;
 import org.eclipse.microprofile.jwt.config.Names;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.json.Json;
@@ -40,11 +41,20 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -64,8 +74,9 @@ public class KidMapper {
     private String jwksUrl;
     private Set<String> defaultIssuers;
     private JsonReaderFactory readerFactory;
-    private CompletableFuture<List<JWK>> jwkSetRequest;
-
+    private volatile CompletableFuture<HttpResponse<String>> jwkSetRequest;
+    HttpClient httpClient;
+    ScheduledExecutorService backgroundThread;
     @PostConstruct
     private void init() {
         ofNullable(config.read("kids.key.mapping", null))
@@ -94,12 +105,24 @@ public class KidMapper {
         ofNullable(config.read("issuer.default", config.read(Names.ISSUER, null))).ifPresent(defaultIssuers::add);
         jwksUrl = config.read("mp.jwt.verify.publickey.location", null);
         ofNullable(jwksUrl).ifPresent(url -> {
-            HttpClient httpClient = HttpClient.newBuilder().build();
-            HttpRequest request = HttpRequest.newBuilder().GET().uri(URI.create(jwksUrl)).header("Accept", "application/json").build();
-            jwkSetRequest =  httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenApply(this::parseKeys);
+            backgroundThread = Executors.newSingleThreadScheduledExecutor();
+            httpClient = HttpClient.newBuilder().executor(backgroundThread).build();
+            long SECONDS_REFRESH = getJwksRefreshInterval();
+            backgroundThread.scheduleAtFixedRate(this::reloadRemoteKeys, 1,SECONDS_REFRESH, TimeUnit.SECONDS );
+            reloadRemoteKeys();
         });
         defaultKey = config.read("public-key.default", config.read(Names.VERIFIER_PUBLIC_KEY, null));
         readerFactory = Json.createReaderFactory(emptyMap());
+    }
+
+    private long getJwksRefreshInterval() {
+        String interval = config.read("jwks.invalidationInterval","600");
+        return Integer.parseInt(interval);
+    }
+
+    private void reloadRemoteKeys() {
+        HttpRequest request = HttpRequest.newBuilder().GET().uri(URI.create(jwksUrl)).header("Accept", "application/json").build();
+        jwkSetRequest =  httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
     }
 
     public String loadKey(final String property) {
@@ -143,14 +166,15 @@ public class KidMapper {
         // load jwks via url
         if (jwksUrl != null) {
             try {
-                List<JWK> jwks = jwkSetRequest.get();
+                HttpResponse<String> resposne = jwkSetRequest.get(1, TimeUnit.MINUTES);
+                List<JWK> jwks = parseKeys(resposne);
                 jwks.forEach(jwk -> keyMapping.put(jwk.getKid(), jwk.toPemKey()));
                 String key = keyMapping.get(value);
                 if (key != null) {
                     return key;
                 }
-            } catch (InterruptedException | ExecutionException e) {
-                // loading of jwks failed
+            } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                throw new RuntimeException(e);
             }
         }
         return value;
@@ -165,6 +189,19 @@ public class KidMapper {
                 .map(JWK::new)
                 .filter(it -> it.getUse() == null || "sig".equals(it.getUse()))
                 .collect(toList());
+    }
+
+    @PreDestroy
+    private void destroy() {
+        if(backgroundThread != null) {
+            backgroundThread.shutdown();
+        }
+        if(jwkSetRequest != null && !jwkSetRequest.isDone()){
+            try {
+                jwkSetRequest.get(1, TimeUnit.MINUTES);
+            } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            }
+        }
     }
 
 }
