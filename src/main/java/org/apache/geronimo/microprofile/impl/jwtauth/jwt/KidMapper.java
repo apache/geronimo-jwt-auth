@@ -18,6 +18,7 @@ package org.apache.geronimo.microprofile.impl.jwtauth.jwt;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Optional.ofNullable;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -56,6 +57,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
@@ -66,14 +68,16 @@ public class KidMapper {
     @Inject
     private GeronimoJwtAuthConfig config;
 
-    private ConcurrentMap<String, String> keyMapping = new ConcurrentHashMap<>();
+    private volatile ConcurrentMap<String, String> keyMapping = new ConcurrentHashMap<>();
     private final Map<String, Collection<String>> issuerMapping = new HashMap<>();
     private String defaultKey;
     private String jwksUrl;
+    private String defaultKid;
+    private int refreshInterval;
     private Set<String> defaultIssuers;
     private JsonReaderFactory readerFactory;
     private CompletableFuture<Void> reloadJwksRequest;
-    HttpClient httpClient;
+    private HttpClient httpClient;
     ScheduledExecutorService backgroundThread;
     @PostConstruct
     private void init() {
@@ -101,46 +105,59 @@ public class KidMapper {
                                     .collect(Collectors.toSet()))
                                 .orElseGet(HashSet::new);
         ofNullable(config.read("issuer.default", config.read(Names.ISSUER, null))).ifPresent(defaultIssuers::add);
+        defaultKid = config.read("jwt.header.kid.default", null);
         jwksUrl = config.read("mp.jwt.verify.publickey.location", null);
+        refreshInterval = Integer.parseInt(config.read("jwks.invalidation.interval","0"));
         readerFactory = Json.createReaderFactory(emptyMap());
         ofNullable(jwksUrl).ifPresent(url -> {
             HttpClient.Builder builder = HttpClient.newBuilder();
-            if (getJwksRefreshInterval() != null) {
-                long secondsRefresh = getJwksRefreshInterval();
-                backgroundThread = Executors.newSingleThreadScheduledExecutor();
+            customize(builder);
+            backgroundThread = newExecutor();
+            if (refreshInterval > 0) {
                 builder.executor(backgroundThread);
-                backgroundThread.scheduleAtFixedRate(this::reloadRemoteKeys, getJwksRefreshInterval(), secondsRefresh, SECONDS);
+                backgroundThread.scheduleAtFixedRate(() -> reloadRemoteKeys(backgroundThread), refreshInterval, refreshInterval, SECONDS);
             }
             httpClient = builder.build();
-            reloadJwksRequest = reloadRemoteKeys();// inital load, otherwise the background thread is too slow to start and serve
+            reloadJwksRequest = reloadRemoteKeys(backgroundThread);// inital load, otherwise the background thread is too slow to start and serve
+            if (refreshInterval <= 0) {
+                reloadJwksRequest.thenRunAsync(() -> {
+                    if (httpClient instanceof AutoCloseable) {
+                        try {
+                            ((AutoCloseable) httpClient).close();
+                        } catch (Exception e) {
+                            // ignore
+                        }
+                    }
+                    httpClient = null;
+                    destroy();
+                }, backgroundThread);
+            }
         });
         defaultKey = config.read("public-key.default", config.read(Names.VERIFIER_PUBLIC_KEY, null));
     }
 
-    private Integer getJwksRefreshInterval() {
-        String interval = config.read("jwks.invalidation.interval",null);
-        if (interval != null) {
-            return Integer.parseInt(interval);
-        } else {
-            return null;
-        }
+    protected ScheduledExecutorService newExecutor() {
+        return Executors.newSingleThreadScheduledExecutor(worker -> new Thread(worker, KidMapper.class.getName()));
     }
 
-    private CompletableFuture<Void> reloadRemoteKeys() {
-        HttpRequest request = HttpRequest.newBuilder().GET().uri(URI.create(jwksUrl)).header("Accept", "application/json").build();
-        CompletableFuture<HttpResponse<String>> httpResponseCompletableFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-        CompletableFuture<Void> ongoingRequest = httpResponseCompletableFuture.thenApply(result -> {
-            List<JWK> jwks = parseKeys(result);
-            ConcurrentHashMap<String, String> newKeys = new ConcurrentHashMap<>();
-            jwks.forEach(key -> newKeys.put(key.getKid(), key.toPemKey()));
-            keyMapping = newKeys;
-            return null;
-        });
+    protected void customize(HttpClient.Builder builder) {
+        // for overwriting, e.g. sslContext + sslParameters
+    }
 
-        ongoingRequest.thenRun(() -> {
-            reloadJwksRequest = ongoingRequest;
-        });
-        return ongoingRequest;
+    protected CompletableFuture<Void> reloadRemoteKeys(Executor executor) {
+        HttpRequest request = HttpRequest.newBuilder().GET().uri(URI.create(jwksUrl)).header("Accept", "application/json").build();
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAcceptAsync(this::reloadRemoteKeys, executor);
+    }
+
+    private void reloadRemoteKeys(HttpResponse<String> response) {
+        List<JWK> jwks = parseKeys(response);
+        ConcurrentHashMap<String, String> newKeys = new ConcurrentHashMap<>();
+        jwks.forEach(key -> ofNullable(key.getKid()).ifPresent(kid -> newKeys.put(kid, key.toPemKey())));
+        if (newKeys.isEmpty() && defaultKid != null && jwks.size() == 1) {
+            // use default key
+            newKeys.put(defaultKid, jwks.get(0).toPemKey());
+        }
+        keyMapping = newKeys;
     }
 
     public String loadKey(final String property) {
@@ -183,41 +200,48 @@ public class KidMapper {
 
         // load jwks via url
         if (jwksUrl != null) {
-            if(reloadJwksRequest != null) {
-                try {
+            try {
+                if (reloadJwksRequest != null && !reloadJwksRequest.isDone()) {
                     reloadJwksRequest.get();
-                } catch (InterruptedException | ExecutionException e) {
-                    throw new IllegalStateException(e);
+                    reloadJwksRequest = null;
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (ExecutionException e) {
+                throw e.getCause() instanceof RuntimeException ? (RuntimeException) e.getCause() : new IllegalStateException(e.getCause());
             }
-                String key = keyMapping.get(value);
-                if (key != null) {
-                    return key;
-                }
-
+            String key = keyMapping.get(value);
+            if (key != null) {
+                return key;
+            }
         }
         return value;
     }
 
     private List<JWK> parseKeys(HttpResponse<String> keyResponse) {
-        StringReader stringReader = new StringReader(keyResponse.body());
-        JsonReader jwksReader = readerFactory.createReader(stringReader);
-        JsonObject keySet = jwksReader.readObject();
-        JsonArray keys = keySet.getJsonArray("keys");
-        return keys.stream()
-                .map(JsonValue::asJsonObject)
-                .map(JWK::new)
-                .filter(it -> it.getUse() == null || "sig".equals(it.getUse()))
-                .collect(toList());
+        try (final JsonReader reader = readerFactory.createReader(new StringReader(keyResponse.body()))) {
+            JsonObject keySet = reader.readObject();
+            JsonArray keys = keySet.getJsonArray("keys");
+            return keys.stream()
+                    .map(JsonValue::asJsonObject)
+                    .map(JWK::new)
+                    .filter(it -> it.getUse() == null || "sig".equals(it.getUse()))
+                    .collect(toList());
+        }
     }
 
     @PreDestroy
     private void destroy() {
-        if (backgroundThread != null) {
-            backgroundThread.shutdown();
-        }
-        if (reloadJwksRequest != null) {
+        if (reloadJwksRequest != null && !reloadJwksRequest.isDone()) {
             reloadJwksRequest.cancel(true);
+        }
+        if (backgroundThread != null) {
+            backgroundThread.shutdownNow();
+            try {
+                backgroundThread.awaitTermination(1, MINUTES);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

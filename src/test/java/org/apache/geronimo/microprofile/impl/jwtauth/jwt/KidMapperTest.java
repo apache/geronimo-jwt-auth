@@ -12,6 +12,7 @@ import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.arquillian.testng.Arquillian;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
+import org.jboss.shrinkwrap.api.asset.StringAsset;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -24,9 +25,11 @@ public class KidMapperTest extends Arquillian {
     public static WebArchive createDeployment() throws Exception {
         jwksServer = new JwksServer();
         jwksServer.start();
-        System.setProperty("mp.jwt.verify.publickey.location", "http://localhost:" + jwksServer.getPort() + "/jwks.json");
         return ShrinkWrap
             .create(WebArchive.class)
+            .addAsWebInfResource(new StringAsset(
+                "mp.jwt.verify.publickey.location=http://localhost:" + jwksServer.getPort() + "/jwks.json"),
+                "classes/META-INF/geronimo/microprofile/jwt-auth.properties")
             .addAsWebInfResource("META-INF/beans.xml", "beans.xml")
             .addClasses(JwtParser.class, KidMapper.class, PublicKeyResource.class);
     }
