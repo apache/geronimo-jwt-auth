@@ -168,6 +168,7 @@
         <version>2.21.0</version>
         <configuration>
           <suiteXmlFiles>
+            <suiteXmlFile>${project.basedir}/src/test/resources/geronimo.xml</suiteXmlFile>
             <suiteXmlFile>${project.basedir}/src/test/resources/tck.xml</suiteXmlFile>
           </suiteXmlFiles>
         </configuration>
