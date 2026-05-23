@@ -18,15 +18,16 @@ package org.apache.geronimo.microprofile.impl.jwtauth.servlet;
 
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import java.security.Principal;
-import java.util.LinkedHashSet;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import javax.json.JsonString;
+import javax.json.JsonValue;
 import javax.security.auth.Subject;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -40,12 +41,14 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 public class JwtRequest extends HttpServletRequestWrapper implements TokenAccessor {
     private final Supplier<JsonWebToken> tokenExtractor;
     private final String headerName;
+    private final String groupsName;
     private volatile JsonWebToken token; // cache for perf reasons
 
-    public JwtRequest(final JwtParser service, final String header, final String cookie,
+    public JwtRequest(final JwtParser service, final String header, final String cookie, final String groupsName,
                       final String prefix, final HttpServletRequest request) {
         super(request);
         this.headerName = header;
+        this.groupsName = groupsName;
 
         this.tokenExtractor = () -> {
             if (token != null) {
@@ -132,7 +135,20 @@ public class JwtRequest extends HttpServletRequestWrapper implements TokenAccess
 
     @Override
     public boolean isUserInRole(final String role) {
-        return tokenExtractor.get().getGroups().contains(role);
+        final Set<String> groups = new HashSet<>();
+        Optional.<JsonValue>ofNullable(tokenExtractor.get().getClaim(groupsName))
+            .ifPresent(c -> {
+                if (c.getValueType() == JsonValue.ValueType.ARRAY) {
+                    groups.addAll(c.asJsonArray().stream()
+                            .map(grp -> ((JsonString) grp).getString())
+                            .collect(toSet()));
+                } else if (c.getValueType() == JsonValue.ValueType.STRING) {
+                    groups.addAll(Stream.of(JsonString.class.cast(c).getString().split(","))
+                            .collect(toSet()));
+                }
+            });
+
+        return (groups.isEmpty() ? tokenExtractor.get().getGroups().contains(role) : groups.contains(role));
     }
 
     @Override
